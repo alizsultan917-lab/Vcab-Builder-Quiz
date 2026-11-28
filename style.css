@@ -6002,3 +6002,976 @@ body.bubbly-mode .quiz-answer-box {
   }
 }
 
+/* =====================================================================
+   GRE WORD PAIRS & COLOR-CODED TONE / NUANCE SYSTEM
+   ===================================================================== */
+.pairs-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.pair-legend-card {
+  padding: 0.9rem 1.25rem;
+}
+
+.pair-legend-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.55rem;
+}
+
+.pair-legend-title {
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: var(--ink);
+  letter-spacing: 0.01em;
+}
+
+.pair-legend-note {
+  font-size: 0.76rem;
+  color: var(--ink-soft);
+}
+
+.pair-legend-items {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.pair-legend-sep {
+  color: var(--ink-soft);
+  opacity: 0.55;
+  padding: 0 0.15rem;
+  user-select: none;
+}
+
+/* Color-coded Tone & Nuance Badges */
+.pair-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.18rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.3;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+
+/* Core Polarity Colors */
+.pair-badge-pol-pos {
+  background: #d1fae5;
+  color: #065f46;
+  border-color: #10b981;
+}
+
+.pair-badge-pol-neg {
+  background: #fee2e2;
+  color: #991b1b;
+  border-color: #ef4444;
+}
+
+.pair-badge-pol-neu {
+  background: #e2e8f0;
+  color: #1e3a5f;
+  border-color: #64748b;
+}
+
+/* Secondary Nuance: Intensity */
+.pair-badge-int-mild {
+  background: #fef3c7;
+  color: #92400e;
+  border-color: #f59e0b;
+}
+
+.pair-badge-int-mod {
+  background: #ffedd5;
+  color: #9a3412;
+  border-color: #f97316;
+}
+
+.pair-badge-int-ext {
+  background: #fecaca;
+  color: #7f1d1d;
+  border-color: #dc2626;
+}
+
+/* Secondary Nuance: Formality / Register */
+.pair-badge-reg-cas {
+  background: #ccfbf1;
+  color: #115e59;
+  border-color: #14b8a6;
+}
+
+.pair-badge-reg-std {
+  background: #e0f2fe;
+  color: #0c4a6e;
+  border-color: #38bdf8;
+}
+
+.pair-badge-reg-for {
+  background: #ede9fe;
+  color: #4c1d95;
+  border-color: #7c3aed;
+}
+
+/* Secondary Nuance: Target (Person vs. Thing / Idea) */
+.pair-badge-tgt-per {
+  background: #fce7f3;
+  color: #831843;
+  border-color: #ec4899;
+}
+
+.pair-badge-tgt-thg {
+  background: #cffafe;
+  color: #155e75;
+  border-color: #06b6d4;
+}
+
+.pair-badge-tgt-both {
+  background: #e0e7ff;
+  color: #312e81;
+  border-color: #6366f1;
+}
+
+/* Add / Edit Pair Form */
+.pair-words-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 0.9rem;
+  align-items: start;
+  margin-bottom: 0.5rem;
+}
+
+.pair-word-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.35rem;
+}
+
+.pair-word-label-row label {
+  margin-bottom: 0;
+}
+
+.pair-connector-preview {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.2rem;
+  height: 2.4rem;
+  margin-top: 1.65rem;
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: var(--blue-deep);
+  background: var(--blue-pale);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+}
+
+.pair-register-match {
+  margin: 0.35rem 0 0;
+  padding: 0.38rem 0.6rem;
+  border-radius: 8px;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  background: color-mix(in srgb, var(--blue-pale) 65%, #ffffff);
+  border: 1px solid var(--border);
+  color: var(--ink);
+}
+
+.pair-type-group {
+  margin-bottom: 0.95rem;
+}
+
+.pair-type-hint {
+  margin: 0.35rem 0 0;
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+}
+
+.pair-tones-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.6rem;
+}
+
+.pair-tones-heading {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.pair-tones-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.95rem;
+  margin-bottom: 1rem;
+}
+
+.pair-tone-panel {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0.9rem 1rem;
+  background: #f9fbfd;
+  transition: border-color 0.2s ease, background-color 0.2s ease;
+}
+
+.pair-tone-panel.tone-panel-pos {
+  border-color: rgba(16, 185, 129, 0.55);
+  background: rgba(16, 185, 129, 0.06);
+}
+
+.pair-tone-panel.tone-panel-neg {
+  border-color: rgba(239, 68, 68, 0.55);
+  background: rgba(239, 68, 68, 0.06);
+}
+
+.pair-tone-panel.tone-panel-neu {
+  border-color: rgba(100, 116, 139, 0.45);
+  background: rgba(100, 116, 139, 0.06);
+}
+
+.pair-tone-panel-title {
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: var(--blue-deep);
+  margin-bottom: 0.65rem;
+}
+
+.pair-tone-field {
+  margin-bottom: 0.65rem;
+}
+
+.pair-tone-field:last-child {
+  margin-bottom: 0;
+}
+
+.pair-tone-label,
+.pair-tone-field label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+  margin-bottom: 0.3rem;
+}
+
+.pair-polarity-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.pair-pol-btn {
+  flex: 1 1 auto;
+  padding: 0.38rem 0.6rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: #ffffff;
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.16s ease;
+}
+
+.pair-pol-btn:hover {
+  transform: translateY(-1px);
+}
+
+.pair-pol-pos.active {
+  background: #10b981;
+  border-color: #059669;
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.32);
+}
+
+.pair-pol-neg.active {
+  background: #ef4444;
+  border-color: #dc2626;
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.32);
+}
+
+.pair-pol-neu.active {
+  background: #475569;
+  border-color: #334155;
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(71, 85, 105, 0.28);
+}
+
+.pair-nuance-selects {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.55rem;
+}
+
+.pair-nuance-selects select {
+  font-size: 0.8rem;
+  padding: 0.42rem 0.5rem;
+}
+
+.pair-nuance-note-group textarea {
+  width: 100%;
+  resize: vertical;
+}
+
+.pair-form-error {
+  margin: 0.25rem 0 0.75rem;
+  padding: 0.55rem 0.8rem;
+  border-radius: 10px;
+  background: #fee2e2;
+  border: 1px solid #ef4444;
+  color: #991b1b;
+  font-size: 0.84rem;
+  font-weight: 600;
+}
+
+.pair-form-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+}
+
+/* Filter Bar & Polarity Chips */
+.pair-polarity-filter-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-top: 0.85rem;
+  padding-top: 0.75rem;
+  border-top: 1px dashed var(--border);
+}
+
+.pair-filter-chip {
+  padding: 0.28rem 0.72rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: #ffffff;
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 0.79rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.16s ease;
+}
+
+.pair-filter-chip:hover {
+  border-color: var(--blue-soft);
+}
+
+.pair-filter-chip.active {
+  background: var(--blue);
+  border-color: var(--blue-deep);
+  color: #ffffff;
+}
+
+.pair-filter-chip.pair-chip-pos.active {
+  background: #10b981;
+  border-color: #059669;
+  color: #ffffff;
+}
+
+.pair-filter-chip.pair-chip-neg.active {
+  background: #ef4444;
+  border-color: #dc2626;
+  color: #ffffff;
+}
+
+.pair-filter-chip.pair-chip-neu.active {
+  background: #475569;
+  border-color: #334155;
+  color: #ffffff;
+}
+
+/* Saved Word Pairs Cards */
+.pairs-cards-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.pair-card {
+  margin-bottom: 0;
+  padding: 1.15rem 1.3rem;
+}
+
+.pair-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.85rem;
+  padding-bottom: 0.6rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.pair-card-badges-left {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.pair-type-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.22rem 0.7rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  background: var(--blue-pale);
+  color: var(--blue-deep);
+  border: 1px solid var(--blue-soft);
+}
+
+.pair-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.pair-comparison-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 0.85rem;
+  align-items: stretch;
+}
+
+.pair-word-box {
+  border-radius: 12px;
+  padding: 0.85rem 1rem;
+  border: 1.5px solid var(--border);
+  background: #fbfdff;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.pair-word-box--pos {
+  border-color: rgba(16, 185, 129, 0.7);
+  background: linear-gradient(180deg, rgba(16, 185, 129, 0.11) 0%, rgba(16, 185, 129, 0.04) 100%);
+}
+
+.pair-word-box--neg {
+  border-color: rgba(239, 68, 68, 0.7);
+  background: linear-gradient(180deg, rgba(239, 68, 68, 0.11) 0%, rgba(239, 68, 68, 0.04) 100%);
+}
+
+.pair-word-box--neu {
+  border-color: rgba(100, 116, 139, 0.6);
+  background: linear-gradient(180deg, rgba(100, 116, 139, 0.11) 0%, rgba(100, 116, 139, 0.04) 100%);
+}
+
+.pair-word-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.pair-word-title {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-size: 1.24rem;
+  font-weight: 700;
+  margin: 0;
+  color: var(--ink);
+}
+
+.pair-word-box--pos .pair-word-title {
+  color: #065f46;
+}
+
+.pair-word-box--neg .pair-word-title {
+  color: #991b1b;
+}
+
+.pair-word-box--neu .pair-word-title {
+  color: #1e3a5f;
+}
+
+.pair-word-def {
+  margin: 0;
+  font-size: calc(0.84rem * var(--def-text-scale));
+  line-height: 1.45;
+  color: var(--ink-soft);
+}
+
+.pair-badges-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.pair-connector-symbol {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  align-self: center;
+  min-width: 2.3rem;
+  height: 2.3rem;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--blue-deep);
+  background: var(--blue-pale);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+}
+
+.pair-nuance-box {
+  margin-top: 0.85rem;
+  padding: 0.65rem 0.9rem;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--blue-pale) 45%, #ffffff);
+  border-left: 3px solid var(--blue);
+  font-size: calc(0.88rem * var(--def-text-scale));
+  color: var(--ink);
+  line-height: 1.45;
+}
+
+.pair-nuance-box strong {
+  color: var(--blue-deep);
+}
+
+/* Flashcard Study Veil */
+.pair-study-veil {
+  margin-top: 0.85rem;
+  width: 100%;
+  justify-content: center;
+}
+
+.pair-card--study-hidden {
+  cursor: pointer;
+}
+
+.pair-card--study-hidden:hover {
+  border-color: var(--accent-color-soft);
+}
+
+/* Bubbly / Liquid Glass Theme Overrides for GRE Pairs */
+body.bubbly-mode .pair-tone-panel {
+  background: color-mix(in srgb, #ffffff calc(var(--glass-alpha) * 0.25 + 6%), transparent);
+}
+
+body.bubbly-mode .pair-tone-panel.tone-panel-pos {
+  background: color-mix(in srgb, #10b981 14%, rgba(255, 255, 255, 0.22));
+}
+
+body.bubbly-mode .pair-tone-panel.tone-panel-neg {
+  background: color-mix(in srgb, #ef4444 14%, rgba(255, 255, 255, 0.22));
+}
+
+body.bubbly-mode .pair-tone-panel.tone-panel-neu {
+  background: color-mix(in srgb, #64748b 14%, rgba(255, 255, 255, 0.22));
+}
+
+body.bubbly-mode .pair-pol-btn,
+body.bubbly-mode .pair-filter-chip {
+  background: rgba(255, 255, 255, 0.72);
+  color: #1c2b3a;
+}
+
+body.bubbly-mode .pair-pol-pos.active,
+body.bubbly-mode .pair-filter-chip.pair-chip-pos.active {
+  background: #10b981;
+  color: #ffffff;
+}
+
+body.bubbly-mode .pair-pol-neg.active,
+body.bubbly-mode .pair-filter-chip.pair-chip-neg.active {
+  background: #ef4444;
+  color: #ffffff;
+}
+
+body.bubbly-mode .pair-pol-neu.active,
+body.bubbly-mode .pair-filter-chip.pair-chip-neu.active {
+  background: #475569;
+  color: #ffffff;
+}
+
+body.bubbly-mode .pair-word-box {
+  background: rgba(255, 255, 255, 0.65);
+}
+
+body.bubbly-mode .pair-word-box--pos {
+  background: linear-gradient(180deg, rgba(16, 185, 129, 0.22) 0%, rgba(255, 255, 255, 0.65) 100%);
+}
+
+body.bubbly-mode .pair-word-box--neg {
+  background: linear-gradient(180deg, rgba(239, 68, 68, 0.22) 0%, rgba(255, 255, 255, 0.65) 100%);
+}
+
+body.bubbly-mode .pair-word-box--neu {
+  background: linear-gradient(180deg, rgba(100, 116, 139, 0.22) 0%, rgba(255, 255, 255, 0.65) 100%);
+}
+
+body.bubbly-mode .pair-nuance-box,
+body.bubbly-mode .pair-register-match,
+body.bubbly-mode .pair-detail-panel,
+body.bubbly-mode .pair-shared-sents-box {
+  background: rgba(255, 255, 255, 0.72);
+  color: #1c2b3a;
+}
+
+/* Manual Definitions & Sentences inside GRE Pairs Form & Cards */
+.pair-details-toolbar {
+  margin-top: 0.2rem;
+}
+
+.pair-shared-def-panel {
+  margin-bottom: 0.85rem;
+  border-color: var(--blue-soft);
+  background: color-mix(in srgb, var(--blue-pale) 45%, #ffffff);
+}
+
+.pair-details-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.95rem;
+  margin-bottom: 0.85rem;
+}
+
+.pair-detail-panel {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0.85rem 1rem;
+  background: #f9fbfd;
+}
+
+.pair-detail-panel .form-group:last-child {
+  margin-bottom: 0;
+}
+
+.pair-mini-list {
+  min-height: 0;
+  max-height: 140px;
+  margin-bottom: 0.45rem;
+}
+
+.pair-mini-list:empty {
+  display: none;
+}
+
+.pair-mini-item {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.35rem 0.55rem;
+  border-radius: 8px;
+  background: #ffffff;
+  border: 1px solid var(--border);
+  font-size: 0.84rem;
+  line-height: 1.4;
+  color: var(--ink);
+}
+
+.pair-mini-item + .pair-mini-item {
+  margin-top: 0.35rem;
+}
+
+.pair-mini-item-text {
+  flex: 1;
+  min-width: 0;
+  word-break: break-word;
+}
+
+.pair-draft-remove-btn {
+  flex-shrink: 0;
+  padding: 0.1rem 0.38rem;
+  font-size: 0.78rem;
+  line-height: 1.2;
+}
+
+.pair-shared-sents-group {
+  margin-bottom: 0.85rem;
+}
+
+.pair-word-defs-list,
+.pair-word-sents-list {
+  margin: 0.15rem 0 0;
+  padding-left: 1.1rem;
+  font-size: calc(0.84rem * var(--def-text-scale));
+  line-height: 1.45;
+  color: var(--ink);
+}
+
+.pair-word-defs-list li + li,
+.pair-word-sents-list li + li {
+  margin-top: 0.25rem;
+}
+
+.pair-word-sents-wrap {
+  margin-top: 0.25rem;
+  padding-top: 0.4rem;
+  border-top: 1px dashed rgba(100, 116, 139, 0.25);
+}
+
+.pair-word-sublabel {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink-soft);
+  margin-bottom: 0.2rem;
+}
+
+.pair-word-sents-list li {
+  font-style: italic;
+}
+
+.pair-shared-sents-box {
+  margin-top: 0.8rem;
+  padding: 0.6rem 0.9rem;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--blue-pale) 35%, #ffffff);
+  border: 1px solid var(--border);
+  font-size: calc(0.86rem * var(--def-text-scale));
+  color: var(--ink);
+}
+
+.pair-shared-sents-box ul {
+  margin: 0.25rem 0 0;
+  padding-left: 1.15rem;
+}
+
+.pair-shared-sents-box li {
+  font-style: italic;
+}
+
+.pair-shared-sents-box li + li {
+  margin-top: 0.25rem;
+}
+
+@media (max-width: 720px) {
+  .pair-words-grid,
+  .pair-tones-grid,
+  .pair-details-grid,
+  .pair-comparison-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .pair-connector-preview {
+    margin-top: 0;
+    justify-self: center;
+  }
+
+  .pair-connector-symbol {
+    justify-self: center;
+  }
+
+  .pair-nuance-selects {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Fetch Limits GRE Pairs Select */
+.limits-select-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.limits-select-row label {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--ink);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.limits-select-row select {
+  width: 100%;
+  font-size: 0.82rem;
+  padding: 0.38rem 0.55rem;
+}
+
+/* Form & Card US/UK Pronunciation for GRE Pairs */
+.pair-pron-panel {
+  margin-top: 0.45rem;
+  padding: 0.42rem 0.65rem;
+  gap: 0.25rem;
+}
+
+.pair-word-head {
+  align-items: center;
+}
+
+.pair-word-audio {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.pair-speak-btn {
+  font-size: 0.74rem;
+  padding: 0.18rem 0.45rem;
+  line-height: 1.2;
+}
+
+.pair-word-phonetics {
+  font-size: 0.76rem;
+  color: var(--ink-soft);
+  font-style: italic;
+}
+
+/* Keep Fetch Limits panel scrollable on shorter screens */
+#limits-panel {
+  max-height: calc(100vh - 76px);
+  overflow-y: auto;
+}
+
+/* Compact Pronunciation Mode (side-by-side US & UK pills) */
+body.compact-pronunciation .pair-pron-panel {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.38rem;
+  margin-top: 0.34rem;
+  padding: 0.24rem 0.42rem;
+  flex-wrap: wrap;
+}
+
+body.compact-pronunciation .pair-pron-panel .pron-row {
+  flex: 1 1 112px;
+  min-width: 0;
+  gap: 0.28rem;
+  padding: 0.14rem 0.34rem;
+  border-radius: 7px;
+  background: rgba(22, 63, 99, 0.045);
+}
+
+body.compact-pronunciation .pair-pron-panel .pron-accent {
+  font-size: 0.64rem;
+  padding: 0.08rem 0.3rem;
+}
+
+body.compact-pronunciation .pair-pron-panel .pron-text {
+  font-size: 0.78rem;
+}
+
+body.compact-pronunciation .pair-pron-panel .pron-play-btn {
+  width: 24px;
+  height: 24px;
+  font-size: 0.74rem;
+  padding: 0;
+}
+
+body.compact-pronunciation #pronunciation-panel {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.3rem 0.5rem;
+  flex-wrap: wrap;
+}
+
+body.compact-pronunciation #pronunciation-panel .pron-row {
+  flex: 1 1 130px;
+  min-width: 0;
+  gap: 0.32rem;
+  padding: 0.16rem 0.38rem;
+  border-radius: 7px;
+  background: rgba(22, 63, 99, 0.045);
+}
+
+body.compact-pronunciation #pronunciation-panel .pron-accent {
+  font-size: 0.65rem;
+  padding: 0.08rem 0.32rem;
+}
+
+body.compact-pronunciation #pronunciation-panel .pron-text {
+  font-size: 0.8rem;
+}
+
+body.compact-pronunciation #pronunciation-panel .pron-play-btn {
+  width: 26px;
+  height: 26px;
+  font-size: 0.76rem;
+  padding: 0;
+}
+
+body.bubbly-mode.compact-pronunciation .pair-pron-panel .pron-row,
+body.bubbly-mode.compact-pronunciation #pronunciation-panel .pron-row {
+  background: rgba(255, 255, 255, 0.45);
+}
+
+/* Single Shared Definition Surrounded by Both Words' Polarity Colors */
+.pair-shared-def-box {
+  --pair-color-a: rgba(100, 116, 139, 0.85);
+  --pair-color-b: rgba(100, 116, 139, 0.85);
+  --pair-tint-a: rgba(100, 116, 139, 0.1);
+  --pair-tint-b: rgba(100, 116, 139, 0.1);
+  margin-top: 0.85rem;
+  padding: 0.7rem 0.95rem;
+  border-radius: 12px;
+  border: 2px solid transparent;
+  background:
+    linear-gradient(90deg, var(--pair-tint-a) 0%, rgba(255, 255, 255, 0) 50%, var(--pair-tint-b) 100%) padding-box,
+    linear-gradient(#ffffff, #ffffff) padding-box,
+    linear-gradient(90deg, var(--pair-color-a) 0%, var(--pair-color-a) 44%, var(--pair-color-b) 56%, var(--pair-color-b) 100%) border-box;
+  box-shadow: 0 2px 10px rgba(22, 63, 99, 0.06);
+  color: var(--ink);
+  font-size: calc(0.88rem * var(--def-text-scale));
+  line-height: 1.48;
+}
+
+.pair-shared-def-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.25rem;
+}
+
+.pair-shared-def-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--blue-deep);
+}
+
+.pair-shared-def-text {
+  margin: 0;
+  color: var(--ink);
+}
+
+.pair-shared-def-list {
+  margin: 0.15rem 0 0;
+  padding-left: 1.15rem;
+}
+
+.pair-shared-def-list li + li {
+  margin-top: 0.25rem;
+}
+
+body.bubbly-mode .pair-shared-def-box {
+  background:
+    linear-gradient(90deg, var(--pair-tint-a) 0%, rgba(255, 255, 255, 0) 50%, var(--pair-tint-b) 100%) padding-box,
+    linear-gradient(rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.9)) padding-box,
+    linear-gradient(90deg, var(--pair-color-a) 0%, var(--pair-color-a) 44%, var(--pair-color-b) 56%, var(--pair-color-b) 100%) border-box;
+  color: #1c2b3a;
+}
+
+
+
+

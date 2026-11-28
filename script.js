@@ -2174,10 +2174,13 @@ async function applySyncDirection(direction, opts = {}) {
         if (driveSettings && Object.keys(driveSettings).length) {
           const before = JSON.stringify(collectAllSettings());
           applySettingsSnapshot(driveSettings);
-          if (JSON.stringify(collectAllSettings()) !== before && reloadOnSettingsChange) {
-            drivePullInProgress = false;
-            location.reload();
-            return { message: "" }; // page is reloading; nothing left to alert
+          if (JSON.stringify(collectAllSettings()) !== before) {
+            if (reloadOnSettingsChange) {
+              drivePullInProgress = false;
+              location.reload();
+              return { message: "" }; // page is reloading; nothing left to alert
+            }
+            refreshWordPairsAfterSync?.();
           }
         }
         // driveSettings === null just means no backup exists yet on Drive
@@ -3207,6 +3210,43 @@ function initFetchLimitsUI() {
     const vds = getVawDefSize();
     vawDefSizeInput.value = vds;
     vawDefSizeValue.textContent = `${vds}%`;
+  }
+  const hideTabsEl = document.getElementById("hide-section-tabs-toggle");
+  if (hideTabsEl && typeof getHideSectionTabs === "function") {
+    hideTabsEl.checked = getHideSectionTabs();
+  }
+  const hideLegendEl = document.getElementById("hide-pair-legend-toggle");
+  if (hideLegendEl && typeof getHidePairLegend === "function") {
+    hideLegendEl.checked = getHidePairLegend();
+  }
+  const compactPronEl = document.getElementById("compact-pronunciation-toggle");
+  if (compactPronEl && typeof getCompactPronunciation === "function") {
+    compactPronEl.checked = getCompactPronunciation();
+  }
+  const pairBehaviorSel = document.getElementById("pair-shared-def-behavior-select");
+  if (pairBehaviorSel && typeof getPairSharedDefBehavior === "function") {
+    pairBehaviorSel.value = getPairSharedDefBehavior();
+  }
+  const satInput = document.getElementById("pair-shared-sat-input");
+  const satVal = document.getElementById("pair-shared-sat-value");
+  if (satInput && typeof getPairSharedDefSat === "function") {
+    const v = getPairSharedDefSat();
+    satInput.value = v;
+    if (satVal) satVal.textContent = `${v}%`;
+  }
+  const tintInput = document.getElementById("pair-shared-tint-input");
+  const tintVal = document.getElementById("pair-shared-tint-value");
+  if (tintInput && typeof getPairSharedDefTint === "function") {
+    const v = getPairSharedDefTint();
+    tintInput.value = v;
+    if (tintVal) tintVal.textContent = `${v}%`;
+  }
+  const borderInput = document.getElementById("pair-shared-border-input");
+  const borderVal = document.getElementById("pair-shared-border-value");
+  if (borderInput && typeof getPairSharedDefBorder === "function") {
+    const v = getPairSharedDefBorder();
+    borderInput.value = v;
+    if (borderVal) borderVal.textContent = `${v}%`;
   }
 }
 
@@ -10121,6 +10161,7 @@ function buildExportPayload() {
     // Nested tree — Page Ranges as chapters, Words as sub-chapters —
     // this is the shape written out to the JSON export file.
     books: buildBooksTree(flatEntries),
+    wordPairs: typeof getSerializedWordPairs === "function" ? getSerializedWordPairs() : [],
   };
 }
 
@@ -10188,7 +10229,8 @@ async function deliverExport(blob, filename, mimeType) {
 }
 
 exportJsonBtn.addEventListener("click", async () => {
-  if (entries.length === 0) {
+  const hasPairs = typeof wordPairs !== "undefined" && Array.isArray(wordPairs) && wordPairs.length > 0;
+  if (entries.length === 0 && !hasPairs) {
     alert("Nothing to export yet.");
     return;
   }
@@ -10204,6 +10246,7 @@ exportJsonBtn.addEventListener("click", async () => {
     exportedAt: payload.exportedAt,
     scope: payload.scope,
     books: payload.books,
+    wordPairs: payload.wordPairs || [],
   };
   const blob = new Blob([JSON.stringify(jsonOutput, null, 2)], { type: "application/json" });
   await deliverExport(blob, `${chosenName || defaultName}.json`, "application/json");
@@ -10604,7 +10647,9 @@ function mergeImportedJson(parsed) {
     incoming = parsed.entries;
   }
 
-  if (incoming.length === 0) {
+  const incomingPairs = Array.isArray(parsed?.wordPairs) ? parsed.wordPairs : [];
+
+  if (incoming.length === 0 && incomingPairs.length === 0) {
     throw new Error("no-entries");
   }
 
@@ -10668,12 +10713,14 @@ function mergeImportedJson(parsed) {
     added++;
   });
 
+  const pairsAdded = typeof mergeImportedWordPairs === "function" ? mergeImportedWordPairs(incomingPairs) : 0;
+
   saveEntries();
   refreshBookFilterOptions();
   refreshBookDatalist();
   renderTable();
   refreshEnhancementViews?.();
-  return added;
+  return { entriesAdded: added, pairsAdded };
 }
 
 importFileInput.addEventListener("change", () => {
@@ -10684,8 +10731,9 @@ importFileInput.addEventListener("change", () => {
   reader.onload = () => {
     try {
       const parsed = JSON.parse(reader.result);
-      const added = mergeImportedJson(parsed);
-      alert(`Imported ${added} new ${added === 1 ? "entry" : "entries"} (duplicates were skipped).`);
+      const { entriesAdded, pairsAdded } = mergeImportedJson(parsed);
+      const pairNote = pairsAdded > 0 ? ` and ${pairsAdded} new word ${pairsAdded === 1 ? "pair" : "pairs"}` : "";
+      alert(`Imported ${entriesAdded} new ${entriesAdded === 1 ? "entry" : "entries"}${pairNote} (duplicates were skipped).`);
     } catch (err) {
       if (err.message === "no-entries") {
         alert("This file doesn't contain any recognizable entries.");
@@ -10813,9 +10861,10 @@ async function importDriveFile(file) {
     const text = await readDriveFileText(file.id);
     const parsed = text.trim() ? JSON.parse(text) : null;
     if (!parsed) throw new Error("no-entries");
-    const added = mergeImportedJson(parsed);
+    const { entriesAdded, pairsAdded } = mergeImportedJson(parsed);
     closeDriveImportModal();
-    alert(`Imported ${added} new ${added === 1 ? "entry" : "entries"} from "${file.name}" (duplicates were skipped).`);
+    const pairNote = pairsAdded > 0 ? ` and ${pairsAdded} new word ${pairsAdded === 1 ? "pair" : "pairs"}` : "";
+    alert(`Imported ${entriesAdded} new ${entriesAdded === 1 ? "entry" : "entries"}${pairNote} from "${file.name}" (duplicates were skipped).`);
   } catch (err) {
     if (err.message === "no-entries") {
       alert(`"${file.name}" doesn't contain any recognizable entries.`);
@@ -14299,14 +14348,17 @@ function toggleWordFocusReveal(entryId, wordElement, reRenderFn) {
 const navTabWords = document.getElementById("nav-tab-words");
 const navTabSentences = document.getElementById("nav-tab-sentences");
 const navTabQuiz = document.getElementById("nav-tab-quiz");
+const navTabPairs = document.getElementById("nav-tab-pairs");
 const navSentencesCount = document.getElementById("nav-sentences-count");
 const navQuizDueCount = document.getElementById("nav-quiz-due-count");
+const navPairsCount = document.getElementById("nav-pairs-count");
 
 const formCardEl = document.getElementById("form-card");
 const filterCardEl = document.getElementById("filter-card");
 const tableCardEl = document.getElementById("table-card");
 const sentencesSectionEl = document.getElementById("sentences-section");
 const quizSectionEl = document.getElementById("quiz-section");
+const pairsSectionEl = document.getElementById("pairs-section");
 
 const focusHideToggle = document.getElementById("focus-hide-toggle");
 const sentFocusModeToggle = document.getElementById("sent-focus-mode-toggle");
@@ -14421,23 +14473,26 @@ function updateSectionNavBadges() {
 }
 
 function switchAppSection(section) {
-  if (!["words", "sentences", "quiz"].includes(section)) return;
+  if (!["words", "sentences", "quiz", "pairs"].includes(section)) return;
   activeAppSection = section;
 
   const isWords = section === "words";
   const isSentences = section === "sentences";
   const isQuiz = section === "quiz";
+  const isPairs = section === "pairs";
 
   formCardEl?.classList.toggle("hidden", !isWords);
   filterCardEl?.classList.toggle("hidden", !isWords);
   tableCardEl?.classList.toggle("hidden", !isWords);
   sentencesSectionEl?.classList.toggle("hidden", !isSentences);
   quizSectionEl?.classList.toggle("hidden", !isQuiz);
+  pairsSectionEl?.classList.toggle("hidden", !isPairs);
 
   [
     [navTabWords, isWords],
     [navTabSentences, isSentences],
     [navTabQuiz, isQuiz],
+    [navTabPairs, isPairs],
   ].forEach(([btn, active]) => {
     if (!btn) return;
     btn.classList.toggle("active", active);
@@ -14456,6 +14511,8 @@ function switchAppSection(section) {
       renderQuizStage();
     }
     updateNotifPermissionBadge();
+  } else if (isPairs) {
+    refreshWordPairsUI();
   }
 }
 
@@ -15072,6 +15129,9 @@ function refreshEnhancementViews() {
     updateQuizStatsUI();
     renderQuizStage();
   }
+  if (typeof refreshWordPairsUI === "function") {
+    refreshWordPairsUI();
+  }
 }
 
 function initVocabEnhancements() {
@@ -15079,6 +15139,9 @@ function initVocabEnhancements() {
   updateSectionNavBadges();
   refreshEnhancementBookFilters();
   updateNotifPermissionBadge();
+  if (typeof initGrePairsSection === "function") {
+    initGrePairsSection();
+  }
 
   if (!localStorage.getItem(LAST_QUIZ_PRACTICE_STORAGE_KEY)) {
     try {
@@ -15105,6 +15168,7 @@ function initVocabEnhancements() {
   navTabWords?.addEventListener("click", () => switchAppSection("words"));
   navTabSentences?.addEventListener("click", () => switchAppSection("sentences"));
   navTabQuiz?.addEventListener("click", () => switchAppSection("quiz"));
+  navTabPairs?.addEventListener("click", () => switchAppSection("pairs"));
 
   // Focus Hide & Visibility toggles
   focusHideToggle?.addEventListener("change", () => setFocusHideMode(focusHideToggle.checked));
@@ -15401,4 +15465,1477 @@ function initVocabEnhancements() {
     });
   }
 }
+
+// =====================================================================
+// GRE WORD PAIRS & COLOR-CODED TONE / NUANCE TAGGING
+// =====================================================================
+const WORD_PAIRS_STORAGE_KEY = "litVocabWordPairs";
+const PAIRS_STUDY_HIDE_STORAGE_KEY = "litVocabPairsStudyHide";
+
+const GRE_PAIR_TYPES = [
+  "Direct Synonyms",
+  "Direct Antonyms",
+  "Degree / Intensity",
+  "Confusable / Look-Alike",
+  "Cause & Effect",
+];
+
+const GRE_PAIR_TYPE_META = {
+  "Direct Synonyms": {
+    symbol: "↔",
+    hint: "Nearly identical meanings — ideal for GRE Sentence Equivalence.",
+  },
+  "Direct Antonyms": {
+    symbol: "↔",
+    hint: "Exact opposite meanings — useful for contrast blanks.",
+  },
+  "Degree / Intensity": {
+    symbol: "→",
+    hint: "Same core meaning, progressing from Word A (mild) to Word B (extreme).",
+  },
+  "Confusable / Look-Alike": {
+    symbol: "↔",
+    hint: "Similar spelling or sound, but distinct meanings (classic GRE trap).",
+  },
+  "Cause & Effect": {
+    symbol: "→",
+    hint: "Word A naturally leads to, provokes, or resolves Word B.",
+  },
+};
+
+const VALID_POLARITIES = new Set(["Positive (+)", "Negative (-)", "Neutral (0)"]);
+const VALID_INTENSITIES = new Set(["N/A", "Mild", "Moderate", "Extreme"]);
+const VALID_FORMALITIES = new Set(["N/A", "Casual", "Standard", "Formal / Literary"]);
+const VALID_TARGETS = new Set(["N/A", "Describes a Person", "Describes a Thing / Idea", "Both"]);
+
+function normalizeToneObj(raw) {
+  const obj = raw && typeof raw === "object" ? raw : {};
+  return {
+    polarity: VALID_POLARITIES.has(obj.polarity) ? obj.polarity : "Neutral (0)",
+    intensity: VALID_INTENSITIES.has(obj.intensity) ? obj.intensity : "N/A",
+    formality: VALID_FORMALITIES.has(obj.formality) ? obj.formality : "N/A",
+    target: VALID_TARGETS.has(obj.target) ? obj.target : "N/A",
+  };
+}
+
+function normalizeStringList(rawList) {
+  if (!Array.isArray(rawList)) return [];
+  const seen = new Set();
+  const out = [];
+  rawList.forEach((item) => {
+    const text = typeof item === "string" ? item.trim() : typeof item?.text === "string" ? item.text.trim() : "";
+    if (!text) return;
+    const key = text.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push(text);
+  });
+  return out;
+}
+
+function normalizePairPhonetics(raw) {
+  const obj = raw && typeof raw === "object" ? raw : {};
+  const normOne = (item) => {
+    if (!item || typeof item !== "object") return null;
+    const text = typeof item.text === "string" ? item.text.trim() : "";
+    const audio = normalizeAudioUrl(item.audio);
+    const source = typeof item.source === "string" ? item.source : undefined;
+    if (!text && !audio) return null;
+    return source ? { text, audio, source } : { text, audio };
+  };
+  return {
+    us: normOne(obj.us),
+    uk: normOne(obj.uk),
+  };
+}
+
+function normalizeWordPair(raw) {
+  const p = raw && typeof raw === "object" ? raw : {};
+  const now = Date.now();
+  return {
+    id: typeof p.id === "string" && p.id.trim() ? p.id.trim() : generateId(),
+    wordA: typeof p.wordA === "string" ? p.wordA.trim() : "",
+    wordB: typeof p.wordB === "string" ? p.wordB.trim() : "",
+    pairType: GRE_PAIR_TYPES.includes(p.pairType) ? p.pairType : "Direct Synonyms",
+    wordATone: normalizeToneObj(p.wordATone),
+    wordBTone: normalizeToneObj(p.wordBTone),
+    wordAPhonetics: normalizePairPhonetics(p.wordAPhonetics),
+    wordBPhonetics: normalizePairPhonetics(p.wordBPhonetics),
+    wordADefinitions: normalizeStringList(p.wordADefinitions),
+    wordBDefinitions: normalizeStringList(p.wordBDefinitions),
+    wordASentences: normalizeStringList(p.wordASentences),
+    wordBSentences: normalizeStringList(p.wordBSentences),
+    pairSentences: normalizeStringList(p.pairSentences),
+    nuanceNote: typeof p.nuanceNote === "string" ? p.nuanceNote.trim() : "",
+    createdAt: Number(p.createdAt) || now,
+    updatedAt: Number(p.updatedAt) || Number(p.createdAt) || now,
+  };
+}
+
+function loadWordPairsFromStorage() {
+  try {
+    const raw = localStorage.getItem(WORD_PAIRS_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .map(normalizeWordPair)
+      .filter((p) => p.wordA && p.wordB);
+  } catch (err) {
+    console.warn("Could not load GRE word pairs:", err);
+    return [];
+  }
+}
+
+const PAIR_SHARED_DEF_BEHAVIOR_KEY = "litVocabPairSharedDefBehavior";
+const PAIR_SHARED_DEF_LAST_STATE_KEY = "litVocabPairSharedDefState";
+const HIDE_SECTION_TABS_KEY = "litVocabHideSectionTabs";
+const HIDE_PAIR_LEGEND_KEY = "litVocabHidePairLegend";
+const COMPACT_PRONUNCIATION_KEY = "litVocabCompactPronunciation";
+const PAIR_SHARED_SAT_KEY = "litVocabPairSharedDefSat";
+const PAIR_SHARED_TINT_KEY = "litVocabPairSharedDefTint";
+const PAIR_SHARED_BORDER_KEY = "litVocabPairSharedDefBorder";
+
+function getHideSectionTabs() {
+  try {
+    return localStorage.getItem(HIDE_SECTION_TABS_KEY) === "true";
+  } catch (err) {
+    return false;
+  }
+}
+
+function applyHideSectionTabs(hidden) {
+  const isHidden = Boolean(hidden);
+  const nav = document.getElementById("section-nav");
+  if (nav) nav.classList.toggle("hidden", isHidden);
+  const toggle = document.getElementById("hide-section-tabs-toggle");
+  if (toggle) toggle.checked = isHidden;
+  try {
+    localStorage.setItem(HIDE_SECTION_TABS_KEY, String(isHidden));
+  } catch (err) {
+    // non-fatal
+  }
+}
+
+function getHidePairLegend() {
+  try {
+    return localStorage.getItem(HIDE_PAIR_LEGEND_KEY) === "true";
+  } catch (err) {
+    return false;
+  }
+}
+
+function applyHidePairLegend(hidden) {
+  const isHidden = Boolean(hidden);
+  const card = document.getElementById("pair-legend-card");
+  if (card) card.classList.toggle("hidden", isHidden);
+  const toggle = document.getElementById("hide-pair-legend-toggle");
+  if (toggle) toggle.checked = isHidden;
+  try {
+    localStorage.setItem(HIDE_PAIR_LEGEND_KEY, String(isHidden));
+  } catch (err) {
+    // non-fatal
+  }
+}
+
+function getCompactPronunciation() {
+  try {
+    return localStorage.getItem(COMPACT_PRONUNCIATION_KEY) === "true";
+  } catch (err) {
+    return false;
+  }
+}
+
+function applyCompactPronunciation(compact) {
+  const isCompact = Boolean(compact);
+  document.body.classList.toggle("compact-pronunciation", isCompact);
+  const toggle = document.getElementById("compact-pronunciation-toggle");
+  if (toggle) toggle.checked = isCompact;
+  try {
+    localStorage.setItem(COMPACT_PRONUNCIATION_KEY, String(isCompact));
+  } catch (err) {
+    // non-fatal
+  }
+}
+
+function clampStoredPercent(key, fallback, min, max) {
+  try {
+    const raw = localStorage.getItem(key);
+    if (raw === null || raw === "") return fallback;
+    const n = Number(raw);
+    if (Number.isNaN(n)) return fallback;
+    return Math.min(max, Math.max(min, n));
+  } catch (err) {
+    return fallback;
+  }
+}
+
+function getPairSharedDefSat() {
+  return clampStoredPercent(PAIR_SHARED_SAT_KEY, 75, 0, 100);
+}
+
+function getPairSharedDefTint() {
+  return clampStoredPercent(PAIR_SHARED_TINT_KEY, 10, 0, 50);
+}
+
+function getPairSharedDefBorder() {
+  return clampStoredPercent(PAIR_SHARED_BORDER_KEY, 85, 0, 100);
+}
+
+function applyPairSharedDefVisualsToCards() {
+  document.querySelectorAll(".pair-shared-def-box").forEach((box) => {
+    const polA = box.dataset.polA || "Neutral (0)";
+    const polB = box.dataset.polB || "Neutral (0)";
+    const cA = getPolarityBorderVars(polA);
+    const cB = getPolarityBorderVars(polB);
+    box.style.setProperty("--pair-color-a", cA.color);
+    box.style.setProperty("--pair-color-b", cB.color);
+    box.style.setProperty("--pair-tint-a", cA.tint);
+    box.style.setProperty("--pair-tint-b", cB.tint);
+  });
+}
+
+function initGlobalLayoutAndPairAppearanceControls() {
+  applyHideSectionTabs(getHideSectionTabs());
+  applyHidePairLegend(getHidePairLegend());
+  applyCompactPronunciation(getCompactPronunciation());
+
+  const hideTabsToggle = document.getElementById("hide-section-tabs-toggle");
+  hideTabsToggle?.addEventListener("change", () => applyHideSectionTabs(hideTabsToggle.checked));
+
+  const hideLegendToggle = document.getElementById("hide-pair-legend-toggle");
+  hideLegendToggle?.addEventListener("change", () => applyHidePairLegend(hideLegendToggle.checked));
+
+  const compactPronToggle = document.getElementById("compact-pronunciation-toggle");
+  compactPronToggle?.addEventListener("change", () => applyCompactPronunciation(compactPronToggle.checked));
+
+  [
+    ["pair-shared-sat-input", "pair-shared-sat-value", PAIR_SHARED_SAT_KEY, getPairSharedDefSat],
+    ["pair-shared-tint-input", "pair-shared-tint-value", PAIR_SHARED_TINT_KEY, getPairSharedDefTint],
+    ["pair-shared-border-input", "pair-shared-border-value", PAIR_SHARED_BORDER_KEY, getPairSharedDefBorder],
+  ].forEach(([inputId, valueId, storageKey, getter]) => {
+    const inputEl = document.getElementById(inputId);
+    const valueEl = document.getElementById(valueId);
+    if (!inputEl) return;
+    const initial = getter();
+    inputEl.value = initial;
+    if (valueEl) valueEl.textContent = `${initial}%`;
+    inputEl.addEventListener("input", () => {
+      const next = Number(inputEl.value);
+      if (valueEl) valueEl.textContent = `${next}%`;
+      try {
+        localStorage.setItem(storageKey, String(next));
+      } catch (err) {
+        // non-fatal
+      }
+      applyPairSharedDefVisualsToCards();
+    });
+  });
+}
+
+function getPairSharedDefBehavior() {
+  try {
+    const raw = localStorage.getItem(PAIR_SHARED_DEF_BEHAVIOR_KEY);
+    if (raw === "remember" || raw === "always-off" || raw === "always-on") return raw;
+  } catch (err) {
+    // non-fatal
+  }
+  return "remember";
+}
+
+function getRememberedSharedDefState() {
+  try {
+    return localStorage.getItem(PAIR_SHARED_DEF_LAST_STATE_KEY) === "on";
+  } catch (err) {
+    return false;
+  }
+}
+
+function getTargetSharedDefStateAfterReset() {
+  const behavior = getPairSharedDefBehavior();
+  if (behavior === "always-on") return true;
+  if (behavior === "always-off") return false;
+  return getRememberedSharedDefState();
+}
+
+let wordPairs = loadWordPairsFromStorage();
+let pairsStudyHideMode = localStorage.getItem(PAIRS_STUDY_HIDE_STORAGE_KEY) === "on";
+let pairsPolarityFilter = "";
+let editingPairId = null;
+let pairSideAPolarity = "Neutral (0)";
+let pairSideBPolarity = "Neutral (0)";
+const pairPendingPhonetics = {
+  a: { us: null, uk: null },
+  b: { us: null, uk: null },
+};
+const pairPhonLookupControllers = { a: null, b: null };
+const revealedPairIds = new Set();
+const justRevealedPairIds = new Set();
+const lightingPairIds = new Set();
+
+function saveWordPairs() {
+  try {
+    localStorage.setItem(WORD_PAIRS_STORAGE_KEY, JSON.stringify(wordPairs));
+  } catch (err) {
+    console.error("Failed to save GRE word pairs:", err);
+  }
+}
+
+function getSerializedWordPairs() {
+  return wordPairs.map(normalizeWordPair);
+}
+
+function pairDedupeKey(pair) {
+  return `${pair.wordA.trim().toLowerCase()}|${pair.wordB.trim().toLowerCase()}|${pair.pairType}`;
+}
+
+function mergeImportedWordPairs(incomingPairs) {
+  if (!Array.isArray(incomingPairs) || incomingPairs.length === 0) return 0;
+  const existingIds = new Set(wordPairs.map((p) => p.id));
+  const existingKeys = new Set(wordPairs.map(pairDedupeKey));
+  let added = 0;
+
+  incomingPairs.forEach((raw) => {
+    const normalized = normalizeWordPair(raw);
+    if (!normalized.wordA || !normalized.wordB) return;
+    const key = pairDedupeKey(normalized);
+    if (existingKeys.has(key)) return;
+    if (existingIds.has(normalized.id)) {
+      normalized.id = generateId();
+    }
+    existingIds.add(normalized.id);
+    existingKeys.add(key);
+    wordPairs.push(normalized);
+    added++;
+  });
+
+  if (added > 0) {
+    saveWordPairs();
+  }
+  return added;
+}
+
+function refreshWordPairsAfterSync() {
+  wordPairs = loadWordPairsFromStorage();
+  pairsStudyHideMode = localStorage.getItem(PAIRS_STUDY_HIDE_STORAGE_KEY) === "on";
+  const pairStudyToggle = document.getElementById("pair-study-hide-toggle");
+  if (pairStudyToggle) pairStudyToggle.checked = pairsStudyHideMode;
+  applyHideSectionTabs(getHideSectionTabs());
+  applyHidePairLegend(getHidePairLegend());
+  applyCompactPronunciation(getCompactPronunciation());
+  initFetchLimitsUI();
+  refreshWordPairsUI();
+}
+
+// DOM Refs for GRE Pairs Section
+const pairFormHeading = document.getElementById("pair-form-heading");
+const pairsSummaryBadge = document.getElementById("pairs-summary-badge");
+const pairForm = document.getElementById("pair-form");
+const pairWordDatalist = document.getElementById("pair-word-datalist");
+const pairWordAInput = document.getElementById("pair-word-a-input");
+const pairWordBInput = document.getElementById("pair-word-b-input");
+const pairLinkABtn = document.getElementById("pair-link-a-btn");
+const pairLinkBBtn = document.getElementById("pair-link-b-btn");
+const pairWordAMatch = document.getElementById("pair-word-a-match");
+const pairWordBMatch = document.getElementById("pair-word-b-match");
+const pairConnectorPreview = document.getElementById("pair-connector-preview");
+const pairTypeSelect = document.getElementById("pair-type-select");
+const pairTypeHint = document.getElementById("pair-type-hint");
+const pairCopyToneBtn = document.getElementById("pair-copy-tone-btn");
+const pairTonePanelA = document.getElementById("pair-tone-panel-a");
+const pairTonePanelB = document.getElementById("pair-tone-panel-b");
+const pairAIntensity = document.getElementById("pair-a-intensity");
+const pairAFormality = document.getElementById("pair-a-formality");
+const pairATarget = document.getElementById("pair-a-target");
+const pairBIntensity = document.getElementById("pair-b-intensity");
+const pairBFormality = document.getElementById("pair-b-formality");
+const pairBTarget = document.getElementById("pair-b-target");
+const pairNuanceInput = document.getElementById("pair-nuance-input");
+const pairFormError = document.getElementById("pair-form-error");
+const pairSubmitBtn = document.getElementById("pair-submit-btn");
+const pairCancelEditBtn = document.getElementById("pair-cancel-edit-btn");
+
+const pairADefsListEl = document.getElementById("pair-a-defs-list");
+const pairADefInput = document.getElementById("pair-a-def-input");
+const pairAAddDefBtn = document.getElementById("pair-a-add-def-btn");
+const pairASentsListEl = document.getElementById("pair-a-sents-list");
+const pairASentInput = document.getElementById("pair-a-sent-input");
+const pairAAddSentBtn = document.getElementById("pair-a-add-sent-btn");
+
+const pairBDefsListEl = document.getElementById("pair-b-defs-list");
+const pairBDefInput = document.getElementById("pair-b-def-input");
+const pairBAddDefBtn = document.getElementById("pair-b-add-def-btn");
+const pairBSentsListEl = document.getElementById("pair-b-sents-list");
+const pairBSentInput = document.getElementById("pair-b-sent-input");
+const pairBAddSentBtn = document.getElementById("pair-b-add-sent-btn");
+
+const pairSentsListEl = document.getElementById("pair-sents-list");
+const pairSentInput = document.getElementById("pair-sent-input");
+const pairAddSentBtn = document.getElementById("pair-add-sent-btn");
+
+const pairSharedDefToggle = document.getElementById("pair-shared-def-toggle");
+const pairSharedDefPanel = document.getElementById("pair-shared-def-panel");
+const pairSharedDefsListEl = document.getElementById("pair-shared-defs-list");
+const pairSharedDefInput = document.getElementById("pair-shared-def-input");
+const pairSharedAddDefBtn = document.getElementById("pair-shared-add-def-btn");
+const pairADefsGroup = document.getElementById("pair-a-defs-group");
+const pairBDefsGroup = document.getElementById("pair-b-defs-group");
+const pairSharedDefBehaviorSelect = document.getElementById("pair-shared-def-behavior-select");
+
+const pairAPronUsText = document.getElementById("pair-a-pron-us-text");
+const pairAPronUkText = document.getElementById("pair-a-pron-uk-text");
+const pairAPronUsBtn = document.getElementById("pair-a-pron-us-btn");
+const pairAPronUkBtn = document.getElementById("pair-a-pron-uk-btn");
+const pairBPronUsText = document.getElementById("pair-b-pron-us-text");
+const pairBPronUkText = document.getElementById("pair-b-pron-uk-text");
+const pairBPronUsBtn = document.getElementById("pair-b-pron-us-btn");
+const pairBPronUkBtn = document.getElementById("pair-b-pron-uk-btn");
+
+const pairDraftLists = {
+  aDefs: [],
+  aSents: [],
+  bDefs: [],
+  bSents: [],
+  pairSents: [],
+  sharedDefs: [],
+};
+
+function getPairDraftContainer(key) {
+  if (key === "aDefs") return pairADefsListEl;
+  if (key === "aSents") return pairASentsListEl;
+  if (key === "bDefs") return pairBDefsListEl;
+  if (key === "bSents") return pairBSentsListEl;
+  if (key === "pairSents") return pairSentsListEl;
+  if (key === "sharedDefs") return pairSharedDefsListEl;
+  return null;
+}
+
+function renderPairDraftList(key) {
+  const container = getPairDraftContainer(key);
+  if (!container) return;
+  const items = pairDraftLists[key] || [];
+  container.innerHTML = items
+    .map(
+      (txt, idx) => `
+        <div class="pair-mini-item">
+          <span class="pair-mini-item-text">${escapeHtml(txt)}</span>
+          <button type="button" class="icon-btn danger pair-draft-remove-btn" data-list-key="${key}" data-idx="${idx}" title="Remove">✕</button>
+        </div>`
+    )
+    .join("");
+}
+
+function renderAllPairDraftLists() {
+  ["aDefs", "aSents", "bDefs", "bSents", "pairSents", "sharedDefs"].forEach(renderPairDraftList);
+}
+
+function syncSharedDefsToBothSides() {
+  const synced = pairDraftLists.sharedDefs.slice();
+  pairDraftLists.aDefs = synced.slice();
+  pairDraftLists.bDefs = synced.slice();
+  renderPairDraftList("aDefs");
+  renderPairDraftList("bDefs");
+}
+
+function setSharedDefMode(enabled, { persistLast = true } = {}) {
+  const on = Boolean(enabled);
+  if (pairSharedDefToggle) pairSharedDefToggle.checked = on;
+
+  if (persistLast) {
+    try {
+      localStorage.setItem(PAIR_SHARED_DEF_LAST_STATE_KEY, on ? "on" : "off");
+    } catch (err) {
+      // non-fatal
+    }
+  }
+
+  if (on) {
+    commitPairTextareaToDraft("aDefs", pairADefInput);
+    commitPairTextareaToDraft("bDefs", pairBDefInput);
+    pairDraftLists.sharedDefs = normalizeStringList([
+      ...pairDraftLists.sharedDefs,
+      ...pairDraftLists.aDefs,
+      ...pairDraftLists.bDefs,
+    ]);
+    syncSharedDefsToBothSides();
+    renderPairDraftList("sharedDefs");
+  } else {
+    commitPairTextareaToDraft("sharedDefs", pairSharedDefInput);
+    if (pairDraftLists.sharedDefs.length > 0) {
+      pairDraftLists.aDefs = normalizeStringList([...pairDraftLists.sharedDefs, ...pairDraftLists.aDefs]);
+      pairDraftLists.bDefs = normalizeStringList([...pairDraftLists.sharedDefs, ...pairDraftLists.bDefs]);
+      renderPairDraftList("aDefs");
+      renderPairDraftList("bDefs");
+    }
+  }
+
+  pairSharedDefPanel?.classList.toggle("hidden", !on);
+  pairADefsGroup?.classList.toggle("hidden", on);
+  pairBDefsGroup?.classList.toggle("hidden", on);
+}
+
+function addItemToPairDraftList(key, rawText) {
+  const text = (rawText || "").trim();
+  if (!text) return false;
+  const arr = pairDraftLists[key];
+  if (!arr) return false;
+  if (!arr.some((item) => item.toLowerCase() === text.toLowerCase())) {
+    arr.push(text);
+    renderPairDraftList(key);
+    if (key === "sharedDefs") {
+      syncSharedDefsToBothSides();
+    }
+  }
+  return true;
+}
+
+function commitPairTextareaToDraft(key, textareaEl) {
+  if (!textareaEl) return;
+  if (addItemToPairDraftList(key, textareaEl.value)) {
+    textareaEl.value = "";
+  }
+}
+
+const pairSearchInput = document.getElementById("pair-search-input");
+const pairFilterType = document.getElementById("pair-filter-type");
+const pairStudyHideToggle = document.getElementById("pair-study-hide-toggle");
+const pairPolarityFilterRow = document.getElementById("pair-polarity-filter-row");
+const pairsCardsContainer = document.getElementById("pairs-cards-container");
+
+function getPolarityKey(polarity) {
+  if (polarity === "Positive (+)") return "pos";
+  if (polarity === "Negative (-)") return "neg";
+  return "neu";
+}
+
+function getPolarityBadgeClass(polarity) {
+  if (polarity === "Positive (+)") return "pair-badge-pol-pos";
+  if (polarity === "Negative (-)") return "pair-badge-pol-neg";
+  return "pair-badge-pol-neu";
+}
+
+function getPolarityShortLabel(polarity) {
+  if (polarity === "Positive (+)") return "+ Positive";
+  if (polarity === "Negative (-)") return "− Negative";
+  return "0 Neutral";
+}
+
+function getIntensityBadgeClass(intensity) {
+  if (intensity === "Mild") return "pair-badge-int-mild";
+  if (intensity === "Moderate") return "pair-badge-int-mod";
+  if (intensity === "Extreme") return "pair-badge-int-ext";
+  return "";
+}
+
+function getFormalityBadgeClass(formality) {
+  if (formality === "Casual") return "pair-badge-reg-cas";
+  if (formality === "Standard") return "pair-badge-reg-std";
+  if (formality === "Formal / Literary") return "pair-badge-reg-for";
+  return "";
+}
+
+function getTargetBadgeClass(target) {
+  if (target === "Describes a Person") return "pair-badge-tgt-per";
+  if (target === "Describes a Thing / Idea") return "pair-badge-tgt-thg";
+  if (target === "Both") return "pair-badge-tgt-both";
+  return "";
+}
+
+function renderToneBadgesHtml(tone) {
+  const t = normalizeToneObj(tone);
+  const badges = [
+    `<span class="pair-badge ${getPolarityBadgeClass(t.polarity)}">${escapeHtml(getPolarityShortLabel(t.polarity))}</span>`,
+  ];
+  if (t.intensity !== "N/A") {
+    badges.push(`<span class="pair-badge ${getIntensityBadgeClass(t.intensity)}">${escapeHtml(t.intensity)}</span>`);
+  }
+  if (t.formality !== "N/A") {
+    badges.push(`<span class="pair-badge ${getFormalityBadgeClass(t.formality)}">${escapeHtml(t.formality)}</span>`);
+  }
+  if (t.target !== "N/A") {
+    const shortTarget =
+      t.target === "Describes a Person"
+        ? "Person"
+        : t.target === "Describes a Thing / Idea"
+        ? "Thing / Idea"
+        : "Both";
+    badges.push(`<span class="pair-badge ${getTargetBadgeClass(t.target)}">${escapeHtml(shortTarget)}</span>`);
+  }
+  return badges.join("");
+}
+
+function findRegisterWordInfo(wordText) {
+  const q = (wordText || "").trim().toLowerCase();
+  if (!q) return null;
+  const exact = entries.find((e) => (e.word || "").trim().toLowerCase() === q);
+  if (!exact) return null;
+  const { definitions } = getFilteredData(exact);
+  const defs = definitions.map((d) => (d.text || "").trim()).filter(Boolean);
+  const sents = Array.isArray(exact.sentences)
+    ? exact.sentences.map((s) => (typeof s === "string" ? s : s?.text || "").trim()).filter(Boolean)
+    : [];
+  const firstDef = defs[0] || "";
+  return { entry: exact, firstDef, defs, sents };
+}
+
+function updatePairRegisterMatchPreview(side) {
+  const input = side === "a" ? pairWordAInput : pairWordBInput;
+  const matchEl = side === "a" ? pairWordAMatch : pairWordBMatch;
+  if (!input || !matchEl) return;
+
+  const info = findRegisterWordInfo(input.value);
+  if (!info) {
+    matchEl.textContent = "";
+    matchEl.classList.add("hidden");
+    return;
+  }
+
+  const defSnippet = info.firstDef
+    ? info.firstDef.length > 110
+      ? `${info.firstDef.slice(0, 107)}…`
+      : info.firstDef
+    : "Saved in register (no definition shown)";
+  matchEl.innerHTML = `<strong>In Register</strong> (${escapeHtml(info.entry.bookTitle)}): ${escapeHtml(defSnippet)}`;
+  matchEl.classList.remove("hidden");
+}
+
+function renderPairFormPhonetics(side) {
+  const ph = pairPendingPhonetics[side] || { us: null, uk: null };
+  const usEl = side === "a" ? pairAPronUsText : pairBPronUsText;
+  const ukEl = side === "a" ? pairAPronUkText : pairBPronUkText;
+
+  [
+    [usEl, ph.us],
+    [ukEl, ph.uk],
+  ].forEach(([el, data]) => {
+    if (!el) return;
+    el.textContent = data?.text || "—";
+    el.classList.toggle("pron-text-ai", data?.source === "ai");
+  });
+}
+
+async function lookupPairSidePhonetics(side) {
+  const input = side === "a" ? pairWordAInput : pairWordBInput;
+  if (!input) return;
+  const word = input.value.trim();
+
+  if (pairPhonLookupControllers[side]) {
+    pairPhonLookupControllers[side].abort();
+    pairPhonLookupControllers[side] = null;
+  }
+
+  if (!word) {
+    pairPendingPhonetics[side] = { us: null, uk: null };
+    renderPairFormPhonetics(side);
+    return;
+  }
+
+  const regInfo = findRegisterWordInfo(word);
+  if (regInfo?.entry?.phonetics && (regInfo.entry.phonetics.us || regInfo.entry.phonetics.uk)) {
+    pairPendingPhonetics[side] = normalizePairPhonetics(regInfo.entry.phonetics);
+    renderPairFormPhonetics(side);
+    if (pairPendingPhonetics[side].us?.audio && pairPendingPhonetics[side].uk?.audio) {
+      return;
+    }
+  }
+
+  const controller = new AbortController();
+  pairPhonLookupControllers[side] = controller;
+  const requestedWord = word.toLowerCase();
+
+  try {
+    const res = await fetchDefinitions(word, controller.signal);
+    if (controller.signal.aborted) return;
+    if ((input.value.trim() || "").toLowerCase() !== requestedWord) return;
+    if (res?.phonetics) {
+      const fetched = normalizePairPhonetics(res.phonetics);
+      pairPendingPhonetics[side] = {
+        us: fetched.us || pairPendingPhonetics[side]?.us || null,
+        uk: fetched.uk || pairPendingPhonetics[side]?.uk || null,
+      };
+      renderPairFormPhonetics(side);
+    }
+  } catch (err) {
+    // non-fatal; playAudioChain still falls back to TTS cleanly
+  } finally {
+    if (pairPhonLookupControllers[side] === controller) {
+      pairPhonLookupControllers[side] = null;
+    }
+  }
+}
+
+function playPairFormPronunciation(side, accent) {
+  const input = side === "a" ? pairWordAInput : pairWordBInput;
+  const word = input?.value.trim() || "";
+  if (!word) return;
+  const phonetic = pairPendingPhonetics[side]?.[accent];
+  const audioUrl = normalizeAudioUrl(phonetic?.audio);
+  const respelling = phonetic?.source === "ai" ? cleanRespellingForSpeech(phonetic.text) : "";
+  playAudioChain(word, accent, audioUrl, respelling);
+}
+
+function playPairCardPronunciation(pair, side, accent) {
+  if (!pair) return;
+  const word = side === "a" ? pair.wordA : pair.wordB;
+  if (!word) return;
+  const storedPh = side === "a" ? pair.wordAPhonetics : pair.wordBPhonetics;
+  const regPh = findRegisterWordInfo(word)?.entry?.phonetics;
+  const phonetic = storedPh?.[accent] || regPh?.[accent] || null;
+  const audioUrl = normalizeAudioUrl(phonetic?.audio);
+  const respelling = phonetic?.source === "ai" ? cleanRespellingForSpeech(phonetic.text) : "";
+  playAudioChain(word, accent, audioUrl, respelling);
+}
+
+function linkRegisterWordToInput(side) {
+  const input = side === "a" ? pairWordAInput : pairWordBInput;
+  const matchEl = side === "a" ? pairWordAMatch : pairWordBMatch;
+  if (!input) return;
+
+  const typed = input.value.trim().toLowerCase();
+  let matched = null;
+  if (typed) {
+    matched =
+      entries.find((e) => (e.word || "").trim().toLowerCase() === typed) ||
+      entries.find((e) => (e.word || "").trim().toLowerCase().startsWith(typed)) ||
+      entries.find((e) => (e.word || "").trim().toLowerCase().includes(typed));
+  } else if (entries.length > 0) {
+    matched = entries[0];
+  }
+
+  if (matched) {
+    input.value = matched.word;
+    updatePairRegisterMatchPreview(side);
+    const info = findRegisterWordInfo(matched.word);
+    if (info) {
+      const defKey = pairSharedDefToggle?.checked ? "sharedDefs" : side === "a" ? "aDefs" : "bDefs";
+      const sentKey = side === "a" ? "aSents" : "bSents";
+      info.defs.forEach((d) => addItemToPairDraftList(defKey, d));
+      info.sents.forEach((s) => addItemToPairDraftList(sentKey, s));
+      if (info.entry?.phonetics) {
+        pairPendingPhonetics[side] = normalizePairPhonetics(info.entry.phonetics);
+        renderPairFormPhonetics(side);
+      }
+    }
+    lookupPairSidePhonetics(side);
+  } else if (matchEl) {
+    matchEl.textContent = entries.length
+      ? `No word matching "${input.value.trim()}" found in your register.`
+      : "Your vocabulary register has no saved words yet — you can still type any word directly.";
+    matchEl.classList.remove("hidden");
+    input.focus();
+  }
+}
+
+function setFormSidePolarity(side, polarity) {
+  const normalized = VALID_POLARITIES.has(polarity) ? polarity : "Neutral (0)";
+  if (side === "a") pairSideAPolarity = normalized;
+  else pairSideBPolarity = normalized;
+
+  const groupId = side === "a" ? "pair-a-polarity-group" : "pair-b-polarity-group";
+  const groupEl = document.getElementById(groupId);
+  groupEl?.querySelectorAll(".pair-pol-btn").forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.polarity === normalized);
+  });
+
+  const panelEl = side === "a" ? pairTonePanelA : pairTonePanelB;
+  if (panelEl) {
+    panelEl.classList.remove("tone-panel-pos", "tone-panel-neg", "tone-panel-neu");
+    panelEl.classList.add(`tone-panel-${getPolarityKey(normalized)}`);
+  }
+}
+
+function updatePairTypePreview() {
+  if (!pairTypeSelect) return;
+  const meta = GRE_PAIR_TYPE_META[pairTypeSelect.value] || GRE_PAIR_TYPE_META["Direct Synonyms"];
+  if (pairTypeHint) pairTypeHint.textContent = meta.hint;
+  if (pairConnectorPreview) pairConnectorPreview.textContent = meta.symbol;
+}
+
+function setPairFormError(msg) {
+  if (!pairFormError) return;
+  if (!msg) {
+    pairFormError.textContent = "";
+    pairFormError.classList.add("hidden");
+  } else {
+    pairFormError.textContent = msg;
+    pairFormError.classList.remove("hidden");
+  }
+}
+
+function resetPairForm() {
+  editingPairId = null;
+  if (pairFormHeading) pairFormHeading.textContent = "Add a GRE Word Pair";
+  if (pairSubmitBtn) pairSubmitBtn.textContent = "Save Word Pair";
+  pairCancelEditBtn?.classList.add("hidden");
+
+  if (pairWordAInput) pairWordAInput.value = "";
+  if (pairWordBInput) pairWordBInput.value = "";
+  if (pairTypeSelect) pairTypeSelect.value = "Direct Synonyms";
+  if (pairAIntensity) pairAIntensity.value = "N/A";
+  if (pairAFormality) pairAFormality.value = "N/A";
+  if (pairATarget) pairATarget.value = "N/A";
+  if (pairBIntensity) pairBIntensity.value = "N/A";
+  if (pairBFormality) pairBFormality.value = "N/A";
+  if (pairBTarget) pairBTarget.value = "N/A";
+  if (pairNuanceInput) pairNuanceInput.value = "";
+
+  pairDraftLists.aDefs = [];
+  pairDraftLists.aSents = [];
+  pairDraftLists.bDefs = [];
+  pairDraftLists.bSents = [];
+  pairDraftLists.pairSents = [];
+  pairDraftLists.sharedDefs = [];
+  if (pairADefInput) pairADefInput.value = "";
+  if (pairASentInput) pairASentInput.value = "";
+  if (pairBDefInput) pairBDefInput.value = "";
+  if (pairBSentInput) pairBSentInput.value = "";
+  if (pairSentInput) pairSentInput.value = "";
+  if (pairSharedDefInput) pairSharedDefInput.value = "";
+
+  pairPendingPhonetics.a = { us: null, uk: null };
+  pairPendingPhonetics.b = { us: null, uk: null };
+  renderPairFormPhonetics("a");
+  renderPairFormPhonetics("b");
+
+  setSharedDefMode(getTargetSharedDefStateAfterReset(), { persistLast: false });
+  renderAllPairDraftLists();
+
+  setFormSidePolarity("a", "Neutral (0)");
+  setFormSidePolarity("b", "Neutral (0)");
+  updatePairTypePreview();
+  updatePairRegisterMatchPreview("a");
+  updatePairRegisterMatchPreview("b");
+  setPairFormError("");
+}
+
+function startEditWordPair(pairId) {
+  const pair = wordPairs.find((p) => p.id === pairId);
+  if (!pair) return;
+  editingPairId = pair.id;
+
+  if (pairFormHeading) pairFormHeading.textContent = "Edit Word Pair";
+  if (pairSubmitBtn) pairSubmitBtn.textContent = "Update Word Pair";
+  pairCancelEditBtn?.classList.remove("hidden");
+
+  if (pairWordAInput) pairWordAInput.value = pair.wordA;
+  if (pairWordBInput) pairWordBInput.value = pair.wordB;
+  if (pairTypeSelect) pairTypeSelect.value = pair.pairType;
+
+  setFormSidePolarity("a", pair.wordATone.polarity);
+  if (pairAIntensity) pairAIntensity.value = pair.wordATone.intensity;
+  if (pairAFormality) pairAFormality.value = pair.wordATone.formality;
+  if (pairATarget) pairATarget.value = pair.wordATone.target;
+
+  setFormSidePolarity("b", pair.wordBTone.polarity);
+  if (pairBIntensity) pairBIntensity.value = pair.wordBTone.intensity;
+  if (pairBFormality) pairBFormality.value = pair.wordBTone.formality;
+  if (pairBTarget) pairBTarget.value = pair.wordBTone.target;
+
+  pairDraftLists.aDefs = normalizeStringList(pair.wordADefinitions);
+  pairDraftLists.aSents = normalizeStringList(pair.wordASentences);
+  pairDraftLists.bDefs = normalizeStringList(pair.wordBDefinitions);
+  pairDraftLists.bSents = normalizeStringList(pair.wordBSentences);
+  pairDraftLists.pairSents = normalizeStringList(pair.pairSentences);
+  pairDraftLists.sharedDefs = [];
+  if (pairADefInput) pairADefInput.value = "";
+  if (pairASentInput) pairASentInput.value = "";
+  if (pairBDefInput) pairBDefInput.value = "";
+  if (pairBSentInput) pairBSentInput.value = "";
+  if (pairSentInput) pairSentInput.value = "";
+  if (pairSharedDefInput) pairSharedDefInput.value = "";
+
+  pairPendingPhonetics.a = normalizePairPhonetics(pair.wordAPhonetics);
+  pairPendingPhonetics.b = normalizePairPhonetics(pair.wordBPhonetics);
+  renderPairFormPhonetics("a");
+  renderPairFormPhonetics("b");
+  if (!pairPendingPhonetics.a.us && !pairPendingPhonetics.a.uk) lookupPairSidePhonetics("a");
+  if (!pairPendingPhonetics.b.us && !pairPendingPhonetics.b.uk) lookupPairSidePhonetics("b");
+
+  const sameDefs =
+    pairDraftLists.aDefs.length > 0 &&
+    pairDraftLists.aDefs.length === pairDraftLists.bDefs.length &&
+    pairDraftLists.aDefs.every((d, i) => d.toLowerCase() === pairDraftLists.bDefs[i].toLowerCase());
+  setSharedDefMode(sameDefs, { persistLast: false });
+  renderAllPairDraftLists();
+
+  if (pairNuanceInput) pairNuanceInput.value = pair.nuanceNote || "";
+
+  updatePairTypePreview();
+  updatePairRegisterMatchPreview("a");
+  updatePairRegisterMatchPreview("b");
+  setPairFormError("");
+
+  document.getElementById("pair-form-card")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  pairWordAInput?.focus();
+}
+
+function updatePairsNavBadge() {
+  if (navPairsCount) navPairsCount.textContent = String(wordPairs.length);
+  if (pairsSummaryBadge) {
+    pairsSummaryBadge.textContent = `${wordPairs.length} ${wordPairs.length === 1 ? "pair" : "pairs"}`;
+  }
+}
+
+function refreshPairWordDatalist() {
+  if (!pairWordDatalist) return;
+  const words = [...new Set(entries.map((e) => (e.word || "").trim()).filter(Boolean))].sort((a, b) =>
+    a.localeCompare(b)
+  );
+  pairWordDatalist.innerHTML = words.map((w) => `<option value="${escapeHtml(w)}">`).join("");
+}
+
+function togglePairCardStudyReveal(pairId) {
+  if (!pairsStudyHideMode || !pairId) return;
+  if (revealedPairIds.has(pairId)) {
+    revealedPairIds.delete(pairId);
+    justRevealedPairIds.delete(pairId);
+    lightingPairIds.delete(pairId);
+    renderPairsList();
+    return;
+  }
+
+  lightingPairIds.add(pairId);
+  const cardEl = pairsCardsContainer?.querySelector(`.pair-card[data-pair-id="${pairId}"]`);
+  cardEl?.querySelectorAll(".pair-word-title").forEach((el) => {
+    el.classList.remove("word-reveal-lighting");
+    void el.offsetWidth;
+    el.classList.add("word-reveal-lighting");
+  });
+
+  setTimeout(() => {
+    revealedPairIds.add(pairId);
+    justRevealedPairIds.add(pairId);
+    renderPairsList();
+    setTimeout(() => {
+      lightingPairIds.delete(pairId);
+      justRevealedPairIds.delete(pairId);
+      pairsCardsContainer
+        ?.querySelectorAll(`.pair-card[data-pair-id="${pairId}"] .word-reveal-lighting`)
+        .forEach((el) => el.classList.remove("word-reveal-lighting"));
+    }, 550);
+  }, 200);
+}
+
+function getPolarityBorderVars(polarity) {
+  const satFactor = getPairSharedDefSat() / 100;
+  const tintAlpha = (getPairSharedDefTint() / 100).toFixed(2);
+  const borderAlpha = (getPairSharedDefBorder() / 100).toFixed(2);
+
+  let h = 215;
+  let baseSat = 18;
+  let l = 47;
+  if (polarity === "Positive (+)") {
+    h = 160;
+    baseSat = 84;
+    l = 39;
+  } else if (polarity === "Negative (-)") {
+    h = 0;
+    baseSat = 84;
+    l = 58;
+  }
+
+  const s = Math.round(baseSat * satFactor);
+  return {
+    color: `hsla(${h}, ${s}%, ${l}%, ${borderAlpha})`,
+    tint: `hsla(${h}, ${s}%, ${l}%, ${tintAlpha})`,
+  };
+}
+
+function renderPairsList() {
+  updatePairsNavBadge();
+  if (!pairsCardsContainer) return;
+
+  const query = (pairSearchInput?.value || "").trim().toLowerCase();
+  const typeVal = pairFilterType?.value || "";
+  const polVal = pairsPolarityFilter;
+
+  const filtered = wordPairs
+    .filter((pair) => {
+      if (typeVal && pair.pairType !== typeVal) return false;
+      if (polVal) {
+        if (pair.wordATone.polarity !== polVal && pair.wordBTone.polarity !== polVal) {
+          return false;
+        }
+      }
+      if (query) {
+        const infoA = findRegisterWordInfo(pair.wordA);
+        const infoB = findRegisterWordInfo(pair.wordB);
+        const hay = [
+          pair.wordA,
+          pair.wordB,
+          pair.pairType,
+          pair.nuanceNote,
+          ...(pair.wordADefinitions || []),
+          ...(pair.wordBDefinitions || []),
+          ...(pair.wordASentences || []),
+          ...(pair.wordBSentences || []),
+          ...(pair.pairSentences || []),
+          ...(infoA?.defs || []),
+          ...(infoB?.defs || []),
+          ...(infoA?.sents || []),
+          ...(infoB?.sents || []),
+        ]
+          .join(" ")
+          .toLowerCase();
+        if (!hay.includes(query)) return false;
+      }
+      return true;
+    })
+    .slice()
+    .sort((a, b) => (b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0));
+
+  if (filtered.length === 0) {
+    pairsCardsContainer.innerHTML =
+      wordPairs.length === 0
+        ? '<div class="card"><p class="empty-state">No GRE word pairs saved yet. Add your first pair above (e.g. Scold → Castigate, or Disinterested ↔ Uninterested).</p></div>'
+        : '<div class="card"><p class="empty-state">No saved word pairs match your current search or tone filters.</p></div>';
+    return;
+  }
+
+  pairsCardsContainer.innerHTML = filtered
+    .map((pair) => {
+      const meta = GRE_PAIR_TYPE_META[pair.pairType] || GRE_PAIR_TYPE_META["Direct Synonyms"];
+      const isStudyLocked = pairsStudyHideMode && !revealedPairIds.has(pair.id);
+      const justRevealed = justRevealedPairIds.has(pair.id);
+      const isLighting = lightingPairIds.has(pair.id);
+
+      const infoA = findRegisterWordInfo(pair.wordA);
+      const infoB = findRegisterWordInfo(pair.wordB);
+
+      const defsA = normalizeStringList([...(pair.wordADefinitions || []), ...(infoA?.defs || [])]);
+      const defsB = normalizeStringList([...(pair.wordBDefinitions || []), ...(infoB?.defs || [])]);
+      const sentsA = normalizeStringList([...(pair.wordASentences || []), ...(infoA?.sents || [])]);
+      const sentsB = normalizeStringList([...(pair.wordBSentences || []), ...(infoB?.sents || [])]);
+      const sharedSents = normalizeStringList(pair.pairSentences || []);
+
+      const hasSharedSingleDef =
+        defsA.length > 0 &&
+        defsB.length > 0 &&
+        defsA.length === defsB.length &&
+        defsA.every((d, i) => d.toLowerCase() === defsB[i].toLowerCase());
+
+      const phA = pair.wordAPhonetics || infoA?.entry?.phonetics || null;
+      const phB = pair.wordBPhonetics || infoB?.entry?.phonetics || null;
+      const phTextA = [phA?.us?.text ? `US ${phA.us.text}` : "", phA?.uk?.text ? `UK ${phA.uk.text}` : ""]
+        .filter(Boolean)
+        .join(" · ");
+      const phTextB = [phB?.us?.text ? `US ${phB.us.text}` : "", phB?.uk?.text ? `UK ${phB.uk.text}` : ""]
+        .filter(Boolean)
+        .join(" · ");
+
+      const polKeyA = isStudyLocked ? "hidden" : getPolarityKey(pair.wordATone.polarity);
+      const polKeyB = isStudyLocked ? "hidden" : getPolarityKey(pair.wordBTone.polarity);
+
+      const boxClassA =
+        polKeyA === "pos"
+          ? "pair-word-box--pos"
+          : polKeyA === "neg"
+          ? "pair-word-box--neg"
+          : polKeyA === "neu"
+          ? "pair-word-box--neu"
+          : "";
+      const boxClassB =
+        polKeyB === "pos"
+          ? "pair-word-box--pos"
+          : polKeyB === "neg"
+          ? "pair-word-box--neg"
+          : polKeyB === "neu"
+          ? "pair-word-box--neu"
+          : "";
+
+      const typePillHtml = isStudyLocked
+        ? `<span class="pair-type-pill">👁️ Relationship hidden</span>`
+        : `<span class="pair-type-pill ${justRevealed ? "reveal-content-anim" : ""}">${escapeHtml(pair.pairType)}</span>`;
+
+      const badgesAHtml = isStudyLocked
+        ? ""
+        : `<div class="pair-badges-row ${justRevealed ? "reveal-content-anim" : ""}">${renderToneBadgesHtml(pair.wordATone)}</div>`;
+      const badgesBHtml = isStudyLocked
+        ? ""
+        : `<div class="pair-badges-row ${justRevealed ? "reveal-content-anim" : ""}">${renderToneBadgesHtml(pair.wordBTone)}</div>`;
+
+      const defAHtml =
+        !isStudyLocked && !hasSharedSingleDef && defsA.length
+          ? `<ul class="pair-word-defs-list ${justRevealed ? "reveal-content-anim" : ""}">${defsA
+              .map((d) => `<li>${escapeHtml(d)}</li>`)
+              .join("")}</ul>`
+          : "";
+      const defBHtml =
+        !isStudyLocked && !hasSharedSingleDef && defsB.length
+          ? `<ul class="pair-word-defs-list ${justRevealed ? "reveal-content-anim" : ""}">${defsB
+              .map((d) => `<li>${escapeHtml(d)}</li>`)
+              .join("")}</ul>`
+          : "";
+
+      let sharedDefHtml = "";
+      if (!isStudyLocked && hasSharedSingleDef) {
+        const cA = getPolarityBorderVars(pair.wordATone.polarity);
+        const cB = getPolarityBorderVars(pair.wordBTone.polarity);
+        const sharedDefBody =
+          defsA.length === 1
+            ? `<p class="pair-shared-def-text">${escapeHtml(defsA[0])}</p>`
+            : `<ul class="pair-shared-def-list">${defsA.map((d) => `<li>${escapeHtml(d)}</li>`).join("")}</ul>`;
+        sharedDefHtml = `
+          <div class="pair-shared-def-box ${justRevealed ? "reveal-content-anim" : ""}" data-pol-a="${escapeHtml(pair.wordATone.polarity)}" data-pol-b="${escapeHtml(pair.wordBTone.polarity)}" style="--pair-color-a:${cA.color};--pair-color-b:${cB.color};--pair-tint-a:${cA.tint};--pair-tint-b:${cB.tint};">
+            <div class="pair-shared-def-header">
+              <span class="pair-shared-def-label">Shared Definition</span>
+            </div>
+            ${sharedDefBody}
+          </div>`;
+      }
+
+      const sentAHtml =
+        !isStudyLocked && sentsA.length
+          ? `<div class="pair-word-sents-wrap ${justRevealed ? "reveal-content-anim" : ""}">
+               <div class="pair-word-sublabel">Sentences</div>
+               <ul class="pair-word-sents-list">${sentsA.map((s) => `<li>${escapeHtml(s)}</li>`).join("")}</ul>
+             </div>`
+          : "";
+      const sentBHtml =
+        !isStudyLocked && sentsB.length
+          ? `<div class="pair-word-sents-wrap ${justRevealed ? "reveal-content-anim" : ""}">
+               <div class="pair-word-sublabel">Sentences</div>
+               <ul class="pair-word-sents-list">${sentsB.map((s) => `<li>${escapeHtml(s)}</li>`).join("")}</ul>
+             </div>`
+          : "";
+
+      const sharedSentsHtml =
+        !isStudyLocked && sharedSents.length
+          ? `<div class="pair-shared-sents-box ${justRevealed ? "reveal-content-anim" : ""}">
+               <strong>Pair Sentences:</strong>
+               <ul>${sharedSents.map((s) => `<li>${escapeHtml(s)}</li>`).join("")}</ul>
+             </div>`
+          : "";
+
+      const nuanceOrVeilHtml = isStudyLocked
+        ? `<button type="button" class="focus-masked-box is-clickable-reveal pair-study-veil" data-pair-id="${escapeHtml(pair.id)}">👁️ Click to reveal relationship type, color-coded tones, definitions, sentences &amp; nuance note</button>`
+        : `${sharedDefHtml}${sharedSentsHtml}${
+            pair.nuanceNote
+              ? `<div class="pair-nuance-box ${justRevealed ? "reveal-content-anim" : ""}"><strong>Nuance / Trap:</strong> ${escapeHtml(pair.nuanceNote)}</div>`
+              : ""
+          }`;
+
+      return `
+        <article class="card pair-card${isStudyLocked ? " pair-card--study-hidden" : ""}" data-pair-id="${escapeHtml(pair.id)}">
+          <div class="pair-card-header">
+            <div class="pair-card-badges-left">
+              ${typePillHtml}
+              ${pairsStudyHideMode && !isStudyLocked ? `<span class="sentence-card-meta">Revealed (click card to hide)</span>` : ""}
+            </div>
+            <div class="pair-card-actions">
+              <button type="button" class="icon-btn pair-edit-btn" data-pair-id="${escapeHtml(pair.id)}" title="Edit pair">✏️</button>
+              <button type="button" class="icon-btn danger pair-delete-btn" data-pair-id="${escapeHtml(pair.id)}" title="Delete pair">🗑️</button>
+            </div>
+          </div>
+
+          <div class="pair-comparison-grid">
+            <div class="pair-word-box ${boxClassA}">
+              <div class="pair-word-head">
+                <h3 class="pair-word-title${isLighting ? " word-reveal-lighting" : ""}">${escapeHtml(pair.wordA)}</h3>
+                <div class="pair-word-audio">
+                  <button type="button" class="icon-btn pair-speak-btn" data-pair-id="${escapeHtml(pair.id)}" data-side="a" data-accent="us" title="American pronunciation">US 🔊</button>
+                  <button type="button" class="icon-btn pair-speak-btn" data-pair-id="${escapeHtml(pair.id)}" data-side="a" data-accent="uk" title="British pronunciation">UK 🔊</button>
+                </div>
+              </div>
+              ${phTextA ? `<div class="pair-word-phonetics">${escapeHtml(phTextA)}</div>` : ""}
+              ${badgesAHtml}
+              ${defAHtml}
+              ${sentAHtml}
+            </div>
+
+            <div class="pair-connector-symbol" aria-label="${escapeHtml(pair.pairType)}">${isStudyLocked ? "?" : meta.symbol}</div>
+
+            <div class="pair-word-box ${boxClassB}">
+              <div class="pair-word-head">
+                <h3 class="pair-word-title${isLighting ? " word-reveal-lighting" : ""}">${escapeHtml(pair.wordB)}</h3>
+                <div class="pair-word-audio">
+                  <button type="button" class="icon-btn pair-speak-btn" data-pair-id="${escapeHtml(pair.id)}" data-side="b" data-accent="us" title="American pronunciation">US 🔊</button>
+                  <button type="button" class="icon-btn pair-speak-btn" data-pair-id="${escapeHtml(pair.id)}" data-side="b" data-accent="uk" title="British pronunciation">UK 🔊</button>
+                </div>
+              </div>
+              ${phTextB ? `<div class="pair-word-phonetics">${escapeHtml(phTextB)}</div>` : ""}
+              ${badgesBHtml}
+              ${defBHtml}
+              ${sentBHtml}
+            </div>
+          </div>
+
+          ${nuanceOrVeilHtml}
+        </article>
+      `;
+    })
+    .join("");
+}
+
+function refreshWordPairsUI() {
+  updatePairsNavBadge();
+  refreshPairWordDatalist();
+  updatePairRegisterMatchPreview("a");
+  updatePairRegisterMatchPreview("b");
+  if (activeAppSection === "pairs" || pairsCardsContainer) {
+    renderPairsList();
+  }
+}
+
+let grePairsInitialized = false;
+function initGrePairsSection() {
+  if (grePairsInitialized) {
+    refreshWordPairsUI();
+    return;
+  }
+  grePairsInitialized = true;
+
+  setFormSidePolarity("a", pairSideAPolarity);
+  setFormSidePolarity("b", pairSideBPolarity);
+  updatePairTypePreview();
+
+  if (pairStudyHideToggle) {
+    pairStudyHideToggle.checked = pairsStudyHideMode;
+  }
+
+  if (pairSharedDefBehaviorSelect) {
+    pairSharedDefBehaviorSelect.value = getPairSharedDefBehavior();
+    pairSharedDefBehaviorSelect.addEventListener("change", () => {
+      const nextVal = pairSharedDefBehaviorSelect.value;
+      try {
+        localStorage.setItem(PAIR_SHARED_DEF_BEHAVIOR_KEY, nextVal);
+      } catch (err) {
+        // non-fatal
+      }
+      if (!editingPairId) {
+        if (nextVal === "always-on") setSharedDefMode(true);
+        else if (nextVal === "always-off") setSharedDefMode(false);
+      }
+    });
+  }
+
+  setSharedDefMode(getTargetSharedDefStateAfterReset(), { persistLast: false });
+  renderPairFormPhonetics("a");
+  renderPairFormPhonetics("b");
+
+  const debouncedLookupA = debounce(() => lookupPairSidePhonetics("a"), 420);
+  const debouncedLookupB = debounce(() => lookupPairSidePhonetics("b"), 420);
+
+  pairWordAInput?.addEventListener("input", () => {
+    updatePairRegisterMatchPreview("a");
+    debouncedLookupA();
+  });
+  pairWordBInput?.addEventListener("input", () => {
+    updatePairRegisterMatchPreview("b");
+    debouncedLookupB();
+  });
+  pairLinkABtn?.addEventListener("click", () => linkRegisterWordToInput("a"));
+  pairLinkBBtn?.addEventListener("click", () => linkRegisterWordToInput("b"));
+  pairTypeSelect?.addEventListener("change", updatePairTypePreview);
+
+  [
+    [pairAPronUsBtn, pairWordAInput, "a", "us"],
+    [pairAPronUkBtn, pairWordAInput, "a", "uk"],
+    [pairBPronUsBtn, pairWordBInput, "b", "us"],
+    [pairBPronUkBtn, pairWordBInput, "b", "uk"],
+  ].forEach(([btnEl, inputEl, side, accent]) => {
+    btnEl?.addEventListener("mousedown", (e) => {
+      e.preventDefault();
+      if (inputEl && document.activeElement !== inputEl) inputEl.focus();
+    });
+    btnEl?.addEventListener("click", () => playPairFormPronunciation(side, accent));
+  });
+
+  document.getElementById("pair-form-card")?.addEventListener("click", (e) => {
+    const polBtn = e.target.closest(".pair-pol-btn");
+    if (polBtn) {
+      setFormSidePolarity(polBtn.dataset.side, polBtn.dataset.polarity);
+      return;
+    }
+
+    const removeBtn = e.target.closest(".pair-draft-remove-btn");
+    if (removeBtn) {
+      const key = removeBtn.dataset.listKey;
+      const idx = parseInt(removeBtn.dataset.idx, 10);
+      if (pairDraftLists[key] && !Number.isNaN(idx)) {
+        pairDraftLists[key].splice(idx, 1);
+        renderPairDraftList(key);
+        if (key === "sharedDefs") {
+          syncSharedDefsToBothSides();
+        }
+      }
+    }
+  });
+
+  pairSharedDefToggle?.addEventListener("change", () => {
+    setSharedDefMode(pairSharedDefToggle.checked, { persistLast: true });
+  });
+
+  [
+    ["aDefs", pairADefInput, pairAAddDefBtn],
+    ["aSents", pairASentInput, pairAAddSentBtn],
+    ["bDefs", pairBDefInput, pairBAddDefBtn],
+    ["bSents", pairBSentInput, pairBAddSentBtn],
+    ["pairSents", pairSentInput, pairAddSentBtn],
+    ["sharedDefs", pairSharedDefInput, pairSharedAddDefBtn],
+  ].forEach(([key, textareaEl, btnEl]) => {
+    btnEl?.addEventListener("click", () => commitPairTextareaToDraft(key, textareaEl));
+    textareaEl?.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        commitPairTextareaToDraft(key, textareaEl);
+      }
+    });
+  });
+
+  pairCopyToneBtn?.addEventListener("click", () => {
+    setFormSidePolarity("b", pairSideAPolarity);
+    if (pairBIntensity && pairAIntensity) pairBIntensity.value = pairAIntensity.value;
+    if (pairBFormality && pairAFormality) pairBFormality.value = pairAFormality.value;
+    if (pairBTarget && pairATarget) pairBTarget.value = pairATarget.value;
+  });
+
+  pairCancelEditBtn?.addEventListener("click", resetPairForm);
+
+  pairForm?.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const wordA = pairWordAInput?.value.trim() || "";
+    const wordB = pairWordBInput?.value.trim() || "";
+    if (!wordA || !wordB) {
+      setPairFormError("Please enter both Word A and Word B before saving.");
+      if (!wordA) pairWordAInput?.focus();
+      else pairWordBInput?.focus();
+      return;
+    }
+
+    // Automatically commit any text still sitting in the definition/sentence boxes
+    if (pairSharedDefToggle?.checked) {
+      commitPairTextareaToDraft("sharedDefs", pairSharedDefInput);
+      syncSharedDefsToBothSides();
+    } else {
+      commitPairTextareaToDraft("aDefs", pairADefInput);
+      commitPairTextareaToDraft("bDefs", pairBDefInput);
+    }
+    commitPairTextareaToDraft("aSents", pairASentInput);
+    commitPairTextareaToDraft("bSents", pairBSentInput);
+    commitPairTextareaToDraft("pairSents", pairSentInput);
+
+    setPairFormError("");
+    const now = Date.now();
+    const nextRecord = {
+      id: editingPairId || generateId(),
+      wordA,
+      wordB,
+      pairType: pairTypeSelect?.value || "Direct Synonyms",
+      wordATone: {
+        polarity: pairSideAPolarity,
+        intensity: pairAIntensity?.value || "N/A",
+        formality: pairAFormality?.value || "N/A",
+        target: pairATarget?.value || "N/A",
+      },
+      wordBTone: {
+        polarity: pairSideBPolarity,
+        intensity: pairBIntensity?.value || "N/A",
+        formality: pairBFormality?.value || "N/A",
+        target: pairBTarget?.value || "N/A",
+      },
+      wordAPhonetics: normalizePairPhonetics(pairPendingPhonetics.a),
+      wordBPhonetics: normalizePairPhonetics(pairPendingPhonetics.b),
+      wordADefinitions: pairDraftLists.aDefs.slice(),
+      wordBDefinitions: pairDraftLists.bDefs.slice(),
+      wordASentences: pairDraftLists.aSents.slice(),
+      wordBSentences: pairDraftLists.bSents.slice(),
+      pairSentences: pairDraftLists.pairSents.slice(),
+      nuanceNote: pairNuanceInput?.value.trim() || "",
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    if (editingPairId) {
+      const idx = wordPairs.findIndex((p) => p.id === editingPairId);
+      if (idx >= 0) {
+        nextRecord.createdAt = wordPairs[idx].createdAt || now;
+        wordPairs[idx] = normalizeWordPair(nextRecord);
+      } else {
+        wordPairs.push(normalizeWordPair(nextRecord));
+      }
+    } else {
+      wordPairs.push(normalizeWordPair(nextRecord));
+    }
+
+    saveWordPairs();
+    resetPairForm();
+    renderPairsList();
+  });
+
+  pairSearchInput?.addEventListener("input", debounce(renderPairsList, 150));
+  pairFilterType?.addEventListener("change", renderPairsList);
+
+  pairPolarityFilterRow?.addEventListener("click", (e) => {
+    const chip = e.target.closest(".pair-filter-chip");
+    if (!chip) return;
+    pairsPolarityFilter = chip.dataset.polFilter || "";
+    pairPolarityFilterRow.querySelectorAll(".pair-filter-chip").forEach((c) => {
+      c.classList.toggle("active", (c.dataset.polFilter || "") === pairsPolarityFilter);
+    });
+    renderPairsList();
+  });
+
+  pairStudyHideToggle?.addEventListener("change", () => {
+    pairsStudyHideMode = pairStudyHideToggle.checked;
+    if (!pairsStudyHideMode) {
+      revealedPairIds.clear();
+      justRevealedPairIds.clear();
+      lightingPairIds.clear();
+    }
+    try {
+      localStorage.setItem(PAIRS_STUDY_HIDE_STORAGE_KEY, pairsStudyHideMode ? "on" : "off");
+    } catch (err) {
+      // non-fatal
+    }
+    renderPairsList();
+  });
+
+  pairsCardsContainer?.addEventListener("click", (e) => {
+    const speakBtn = e.target.closest(".pair-speak-btn");
+    if (speakBtn) {
+      const pair = wordPairs.find((p) => p.id === speakBtn.dataset.pairId);
+      if (pair) playPairCardPronunciation(pair, speakBtn.dataset.side, speakBtn.dataset.accent);
+      return;
+    }
+
+    const editBtn = e.target.closest(".pair-edit-btn");
+    if (editBtn) {
+      startEditWordPair(editBtn.dataset.pairId);
+      return;
+    }
+
+    const delBtn = e.target.closest(".pair-delete-btn");
+    if (delBtn) {
+      const id = delBtn.dataset.pairId;
+      const target = wordPairs.find((p) => p.id === id);
+      if (!target) return;
+      if (!confirm(`Delete GRE pair "${target.wordA}" & "${target.wordB}"?`)) return;
+      wordPairs = wordPairs.filter((p) => p.id !== id);
+      if (editingPairId === id) resetPairForm();
+      revealedPairIds.delete(id);
+      saveWordPairs();
+      renderPairsList();
+      return;
+    }
+
+    const veilBtn = e.target.closest(".pair-study-veil");
+    if (veilBtn) {
+      togglePairCardStudyReveal(veilBtn.dataset.pairId);
+      return;
+    }
+
+    if (pairsStudyHideMode) {
+      const card = e.target.closest(".pair-card");
+      if (card?.dataset.pairId) {
+        togglePairCardStudyReveal(card.dataset.pairId);
+      }
+    }
+  });
+
+  refreshWordPairsUI();
+}
+
+initGlobalLayoutAndPairAppearanceControls();
+
 

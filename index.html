@@ -367,6 +367,79 @@
           </div>
         </div>
 
+        <div class="limits-group">
+          <h4 class="limits-group-title">Layout &amp; Pronunciation</h4>
+          <div class="bubbly-toggle-row">
+            <div class="bubbly-toggle-label">
+              <span class="bubbly-toggle-title">Hide Section Tabs Bar</span>
+              <span class="bubbly-toggle-hint">On: hides the Words / Sentences / Quiz / GRE Pairs bar at the top.</span>
+            </div>
+            <label class="switch" for="hide-section-tabs-toggle">
+              <input type="checkbox" id="hide-section-tabs-toggle">
+              <span class="switch-track"><span class="switch-thumb"></span></span>
+            </label>
+          </div>
+
+          <div class="bubbly-toggle-row">
+            <div class="bubbly-toggle-label">
+              <span class="bubbly-toggle-title">Hide Tone &amp; Nuance Color Guide</span>
+              <span class="bubbly-toggle-hint">On: hides the Tone &amp; Nuance Color Guide box at the top of GRE Pairs.</span>
+            </div>
+            <label class="switch" for="hide-pair-legend-toggle">
+              <input type="checkbox" id="hide-pair-legend-toggle">
+              <span class="switch-track"><span class="switch-thumb"></span></span>
+            </label>
+          </div>
+
+          <div class="bubbly-toggle-row">
+            <div class="bubbly-toggle-label">
+              <span class="bubbly-toggle-title">Compact Pronunciation Section</span>
+              <span class="bubbly-toggle-hint">On: places US &amp; UK pronunciation side-by-side in a slim single row to save space.</span>
+            </div>
+            <label class="switch" for="compact-pronunciation-toggle">
+              <input type="checkbox" id="compact-pronunciation-toggle">
+              <span class="switch-track"><span class="switch-thumb"></span></span>
+            </label>
+          </div>
+        </div>
+
+        <div class="limits-group">
+          <h4 class="limits-group-title">GRE Word Pairs</h4>
+          <div class="limits-select-row">
+            <label for="pair-shared-def-behavior-select">Single Definition Toggle After Save</label>
+            <select id="pair-shared-def-behavior-select">
+              <option value="remember">Remember previous setting</option>
+              <option value="always-off">Always turn OFF after saving</option>
+              <option value="always-on">Always turn ON after saving</option>
+            </select>
+            <span class="bubbly-toggle-hint">Controls whether "Single definition for both words" stays as you left it or resets ON/OFF each time you save a pair.</span>
+          </div>
+
+          <div class="slider-field-row" style="margin-top:0.6rem;">
+            <div class="slider-field-label">
+              <label for="pair-shared-sat-input">Shared Def Color Saturation</label>
+              <span id="pair-shared-sat-value" class="slider-value">75%</span>
+            </div>
+            <input type="range" id="pair-shared-sat-input" min="0" max="100" step="5">
+          </div>
+
+          <div class="slider-field-row">
+            <div class="slider-field-label">
+              <label for="pair-shared-tint-input">Shared Def Background Tint</label>
+              <span id="pair-shared-tint-value" class="slider-value">10%</span>
+            </div>
+            <input type="range" id="pair-shared-tint-input" min="0" max="50" step="2">
+          </div>
+
+          <div class="slider-field-row">
+            <div class="slider-field-label">
+              <label for="pair-shared-border-input">Shared Def Border Opacity</label>
+              <span id="pair-shared-border-value" class="slider-value">85%</span>
+            </div>
+            <input type="range" id="pair-shared-border-input" min="0" max="100" step="5">
+          </div>
+        </div>
+
         <p class="storage-sync-hint">Changes apply immediately to your register below — 0 (off) to 10 each.</p>
       </div>
     </div>
@@ -946,6 +1019,11 @@
       <span class="section-tab-label">Quiz</span>
       <span id="nav-quiz-due-count" class="section-tab-badge">0</span>
     </button>
+    <button type="button" id="nav-tab-pairs" class="section-tab-btn" role="tab" aria-selected="false" data-section="pairs">
+      <span class="section-tab-icon" aria-hidden="true">⚖️</span>
+      <span class="section-tab-label">GRE Pairs</span>
+      <span id="nav-pairs-count" class="section-tab-badge">0</span>
+    </button>
   </nav>
 
   <!-- ADD ENTRY FORM -->
@@ -1342,6 +1420,343 @@
       </div>
       <p id="notif-status-msg" class="storage-sync-hint hidden"></p>
     </div>
+  </section>
+
+  <!-- GRE PAIRS SECTION -->
+  <section id="pairs-section" class="pairs-section hidden" aria-label="GRE Word Pairs &amp; Tone Tagging">
+    <!-- Compact Tone & Nuance Color Legend -->
+    <div class="card pair-legend-card" id="pair-legend-card">
+      <div class="pair-legend-header">
+        <span class="pair-legend-title">Tone &amp; Nuance Color Guide</span>
+        <span class="pair-legend-note">Colors stay consistent across cards, filters &amp; liquid/wallpaper themes</span>
+      </div>
+      <div class="pair-legend-items">
+        <span class="pair-badge pair-badge-pol-pos">+ Positive</span>
+        <span class="pair-badge pair-badge-pol-neg">− Negative</span>
+        <span class="pair-badge pair-badge-pol-neu">0 Neutral</span>
+        <span class="pair-legend-sep" aria-hidden="true">·</span>
+        <span class="pair-badge pair-badge-int-mild">Mild</span>
+        <span class="pair-badge pair-badge-int-mod">Moderate</span>
+        <span class="pair-badge pair-badge-int-ext">Extreme</span>
+        <span class="pair-legend-sep" aria-hidden="true">·</span>
+        <span class="pair-badge pair-badge-reg-cas">Casual</span>
+        <span class="pair-badge pair-badge-reg-std">Standard</span>
+        <span class="pair-badge pair-badge-reg-for">Formal / Literary</span>
+        <span class="pair-legend-sep" aria-hidden="true">·</span>
+        <span class="pair-badge pair-badge-tgt-per">Person</span>
+        <span class="pair-badge pair-badge-tgt-thg">Thing / Idea</span>
+        <span class="pair-badge pair-badge-tgt-both">Both</span>
+      </div>
+    </div>
+
+    <!-- Add / Edit Word Pair Form -->
+    <div class="card pair-form-card" id="pair-form-card">
+      <div class="section-header-row">
+        <div>
+          <h2 id="pair-form-heading">Add a GRE Word Pair</h2>
+          <p class="section-subtitle">Group synonyms, antonyms, intensity scales, look-alikes, or cause-effect pairs with tone polarity &amp; nuance notes.</p>
+        </div>
+        <span id="pairs-summary-badge" class="entry-count">0 pairs</span>
+      </div>
+
+      <form id="pair-form" autocomplete="off">
+        <datalist id="pair-word-datalist"></datalist>
+
+        <div class="pair-words-grid">
+          <div class="form-group">
+            <div class="pair-word-label-row">
+              <label for="pair-word-a-input">Word A</label>
+              <button type="button" id="pair-link-a-btn" class="link-btn" title="Auto-fill from a matching word in your vocabulary register">Link from Register</button>
+            </div>
+            <input type="text" id="pair-word-a-input" list="pair-word-datalist" placeholder="e.g. Scold or Alacrity" required>
+            <div class="pronunciation-panel pair-pron-panel" aria-label="Word A Pronunciation">
+              <div class="pron-row">
+                <span class="pron-accent">US</span>
+                <span id="pair-a-pron-us-text" class="pron-text">—</span>
+                <button type="button" id="pair-a-pron-us-btn" class="icon-btn pron-play-btn" title="Play Word A American pronunciation">🔊</button>
+              </div>
+              <div class="pron-row">
+                <span class="pron-accent">UK</span>
+                <span id="pair-a-pron-uk-text" class="pron-text">—</span>
+                <button type="button" id="pair-a-pron-uk-btn" class="icon-btn pron-play-btn" title="Play Word A British pronunciation">🔊</button>
+              </div>
+            </div>
+            <p id="pair-word-a-match" class="pair-register-match hidden"></p>
+          </div>
+
+          <div class="pair-connector-preview" id="pair-connector-preview" aria-hidden="true">↔</div>
+
+          <div class="form-group">
+            <div class="pair-word-label-row">
+              <label for="pair-word-b-input">Word B</label>
+              <button type="button" id="pair-link-b-btn" class="link-btn" title="Auto-fill from a matching word in your vocabulary register">Link from Register</button>
+            </div>
+            <input type="text" id="pair-word-b-input" list="pair-word-datalist" placeholder="e.g. Castigate or Apathy" required>
+            <div class="pronunciation-panel pair-pron-panel" aria-label="Word B Pronunciation">
+              <div class="pron-row">
+                <span class="pron-accent">US</span>
+                <span id="pair-b-pron-us-text" class="pron-text">—</span>
+                <button type="button" id="pair-b-pron-us-btn" class="icon-btn pron-play-btn" title="Play Word B American pronunciation">🔊</button>
+              </div>
+              <div class="pron-row">
+                <span class="pron-accent">UK</span>
+                <span id="pair-b-pron-uk-text" class="pron-text">—</span>
+                <button type="button" id="pair-b-pron-uk-btn" class="icon-btn pron-play-btn" title="Play Word B British pronunciation">🔊</button>
+              </div>
+            </div>
+            <p id="pair-word-b-match" class="pair-register-match hidden"></p>
+          </div>
+        </div>
+
+        <div class="form-group pair-type-group">
+          <label for="pair-type-select">Pair Relationship Type</label>
+          <select id="pair-type-select">
+            <option value="Direct Synonyms">Direct Synonyms (Sentence Equivalence)</option>
+            <option value="Direct Antonyms">Direct Antonyms (Opposite Meanings)</option>
+            <option value="Degree / Intensity">Degree / Intensity (Mild → Extreme)</option>
+            <option value="Confusable / Look-Alike">Confusable / Look-Alike (Trap Pair)</option>
+            <option value="Cause &amp; Effect">Cause &amp; Effect (Word A → Word B)</option>
+          </select>
+          <p id="pair-type-hint" class="pair-type-hint">Nearly identical meanings — ideal for GRE Sentence Equivalence.</p>
+        </div>
+
+        <div class="pair-tones-toolbar">
+          <span class="pair-tones-heading">Tone &amp; Secondary Nuances</span>
+          <button type="button" id="pair-copy-tone-btn" class="btn btn-secondary btn-small">⇄ Copy Word A's tone to Word B</button>
+        </div>
+
+        <div class="pair-tones-grid">
+          <!-- WORD A TONE -->
+          <div class="pair-tone-panel" id="pair-tone-panel-a" data-side="a">
+            <div class="pair-tone-panel-title">Word A Tone</div>
+
+            <div class="pair-tone-field">
+              <span class="pair-tone-label">Core Sentiment (Polarity)</span>
+              <div class="pair-polarity-group" id="pair-a-polarity-group" role="group" aria-label="Word A Polarity">
+                <button type="button" class="pair-pol-btn pair-pol-pos" data-side="a" data-polarity="Positive (+)">+ Positive</button>
+                <button type="button" class="pair-pol-btn pair-pol-neg" data-side="a" data-polarity="Negative (-)">− Negative</button>
+                <button type="button" class="pair-pol-btn pair-pol-neu active" data-side="a" data-polarity="Neutral (0)">0 Neutral</button>
+              </div>
+            </div>
+
+            <div class="pair-nuance-selects">
+              <div class="pair-tone-field">
+                <label for="pair-a-intensity">Intensity</label>
+                <select id="pair-a-intensity">
+                  <option value="N/A">N/A</option>
+                  <option value="Mild">Mild</option>
+                  <option value="Moderate">Moderate</option>
+                  <option value="Extreme">Extreme</option>
+                </select>
+              </div>
+              <div class="pair-tone-field">
+                <label for="pair-a-formality">Formality</label>
+                <select id="pair-a-formality">
+                  <option value="N/A">N/A</option>
+                  <option value="Casual">Casual</option>
+                  <option value="Standard">Standard</option>
+                  <option value="Formal / Literary">Formal / Literary</option>
+                </select>
+              </div>
+              <div class="pair-tone-field">
+                <label for="pair-a-target">Target</label>
+                <select id="pair-a-target">
+                  <option value="N/A">N/A</option>
+                  <option value="Describes a Person">Describes a Person</option>
+                  <option value="Describes a Thing / Idea">Describes a Thing / Idea</option>
+                  <option value="Both">Both</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- WORD B TONE -->
+          <div class="pair-tone-panel" id="pair-tone-panel-b" data-side="b">
+            <div class="pair-tone-panel-title">Word B Tone</div>
+
+            <div class="pair-tone-field">
+              <span class="pair-tone-label">Core Sentiment (Polarity)</span>
+              <div class="pair-polarity-group" id="pair-b-polarity-group" role="group" aria-label="Word B Polarity">
+                <button type="button" class="pair-pol-btn pair-pol-pos" data-side="b" data-polarity="Positive (+)">+ Positive</button>
+                <button type="button" class="pair-pol-btn pair-pol-neg" data-side="b" data-polarity="Negative (-)">− Negative</button>
+                <button type="button" class="pair-pol-btn pair-pol-neu active" data-side="b" data-polarity="Neutral (0)">0 Neutral</button>
+              </div>
+            </div>
+
+            <div class="pair-nuance-selects">
+              <div class="pair-tone-field">
+                <label for="pair-b-intensity">Intensity</label>
+                <select id="pair-b-intensity">
+                  <option value="N/A">N/A</option>
+                  <option value="Mild">Mild</option>
+                  <option value="Moderate">Moderate</option>
+                  <option value="Extreme">Extreme</option>
+                </select>
+              </div>
+              <div class="pair-tone-field">
+                <label for="pair-b-formality">Formality</label>
+                <select id="pair-b-formality">
+                  <option value="N/A">N/A</option>
+                  <option value="Casual">Casual</option>
+                  <option value="Standard">Standard</option>
+                  <option value="Formal / Literary">Formal / Literary</option>
+                </select>
+              </div>
+              <div class="pair-tone-field">
+                <label for="pair-b-target">Target</label>
+                <select id="pair-b-target">
+                  <option value="N/A">N/A</option>
+                  <option value="Describes a Person">Describes a Person</option>
+                  <option value="Describes a Thing / Idea">Describes a Thing / Idea</option>
+                  <option value="Both">Both</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="pair-tones-toolbar pair-details-toolbar">
+          <span class="pair-tones-heading">Definitions &amp; Example Sentences</span>
+          <div class="entries-toggle-group" title="Type one definition and apply it to both Word A and Word B">
+            <label class="switch entries-toggle-switch" for="pair-shared-def-toggle">
+              <input type="checkbox" id="pair-shared-def-toggle">
+              <span class="switch-track"><span class="switch-thumb"></span></span>
+            </label>
+            <span class="entries-toggle-label">Single definition for both words</span>
+          </div>
+        </div>
+
+        <div id="pair-shared-def-panel" class="pair-detail-panel pair-shared-def-panel hidden">
+          <div class="form-group">
+            <div class="def-label-row">
+              <label for="pair-shared-def-input">Shared Definition (Applies to Word A &amp; Word B)</label>
+            </div>
+            <div id="pair-shared-defs-list" class="definitions-list scroll-panel pair-mini-list"></div>
+            <div class="manual-add-row">
+              <textarea id="pair-shared-def-input" rows="2" placeholder="Write one definition for both words and press Enter…"></textarea>
+              <button type="button" id="pair-shared-add-def-btn" class="btn btn-secondary btn-small">Add to Both</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="pair-details-grid">
+          <!-- WORD A DEFINITIONS & SENTENCES -->
+          <div class="pair-detail-panel">
+            <div class="form-group" id="pair-a-defs-group">
+              <div class="def-label-row">
+                <label for="pair-a-def-input">Word A Definitions</label>
+              </div>
+              <div id="pair-a-defs-list" class="definitions-list scroll-panel pair-mini-list"></div>
+              <div class="manual-add-row">
+                <textarea id="pair-a-def-input" rows="2" placeholder="Write Word A definition and press Enter…"></textarea>
+                <button type="button" id="pair-a-add-def-btn" class="btn btn-secondary btn-small">Add</button>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <div class="def-label-row">
+                <label for="pair-a-sent-input">Word A Example Sentences</label>
+              </div>
+              <div id="pair-a-sents-list" class="definitions-list scroll-panel pair-mini-list"></div>
+              <div class="manual-add-row">
+                <textarea id="pair-a-sent-input" rows="2" placeholder="Write Word A example sentence and press Enter…"></textarea>
+                <button type="button" id="pair-a-add-sent-btn" class="btn btn-secondary btn-small">Add</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- WORD B DEFINITIONS & SENTENCES -->
+          <div class="pair-detail-panel">
+            <div class="form-group" id="pair-b-defs-group">
+              <div class="def-label-row">
+                <label for="pair-b-def-input">Word B Definitions</label>
+              </div>
+              <div id="pair-b-defs-list" class="definitions-list scroll-panel pair-mini-list"></div>
+              <div class="manual-add-row">
+                <textarea id="pair-b-def-input" rows="2" placeholder="Write Word B definition and press Enter…"></textarea>
+                <button type="button" id="pair-b-add-def-btn" class="btn btn-secondary btn-small">Add</button>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <div class="def-label-row">
+                <label for="pair-b-sent-input">Word B Example Sentences</label>
+              </div>
+              <div id="pair-b-sents-list" class="definitions-list scroll-panel pair-mini-list"></div>
+              <div class="manual-add-row">
+                <textarea id="pair-b-sent-input" rows="2" placeholder="Write Word B example sentence and press Enter…"></textarea>
+                <button type="button" id="pair-b-add-sent-btn" class="btn btn-secondary btn-small">Add</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-group pair-shared-sents-group">
+          <div class="def-label-row">
+            <label for="pair-sent-input">Pair Comparison / Context Sentences (Optional)</label>
+          </div>
+          <div id="pair-sents-list" class="definitions-list scroll-panel pair-mini-list"></div>
+          <div class="manual-add-row">
+            <textarea id="pair-sent-input" rows="2" placeholder="Write a comparison / GRE practice sentence using this pair and press Enter…"></textarea>
+            <button type="button" id="pair-add-sent-btn" class="btn btn-secondary btn-small">Add</button>
+          </div>
+        </div>
+
+        <div class="form-group pair-nuance-note-group">
+          <label for="pair-nuance-input">Nuance / Trap Note</label>
+          <textarea id="pair-nuance-input" rows="2" placeholder="e.g. Both mean short-lived (formal register), OR Disinterested = impartial vs. Uninterested = bored"></textarea>
+        </div>
+
+        <p id="pair-form-error" class="pair-form-error hidden"></p>
+
+        <div class="pair-form-actions">
+          <button type="submit" id="pair-submit-btn" class="btn btn-primary">Save Word Pair</button>
+          <button type="button" id="pair-cancel-edit-btn" class="btn btn-secondary hidden">Cancel Edit</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Filter & Flashcard Study Controls -->
+    <div class="card filter-card pair-filter-card">
+      <div class="filter-row">
+        <div class="filter-field filter-field-grow">
+          <label for="pair-search-input">Search pairs</label>
+          <input type="text" id="pair-search-input" placeholder="Search Word A, Word B, or nuance note…">
+        </div>
+        <div class="filter-field">
+          <label for="pair-filter-type">Pair Type</label>
+          <select id="pair-filter-type">
+            <option value="">All Relationship Types</option>
+            <option value="Direct Synonyms">Direct Synonyms</option>
+            <option value="Direct Antonyms">Direct Antonyms</option>
+            <option value="Degree / Intensity">Degree / Intensity</option>
+            <option value="Confusable / Look-Alike">Confusable / Look-Alike</option>
+            <option value="Cause &amp; Effect">Cause &amp; Effect</option>
+          </select>
+        </div>
+        <div class="entries-visibility-cluster">
+          <div class="entries-toggle-group" title="Quick Flashcard Flip Mode: hides relationship type, tones, definitions &amp; nuance notes until you click a pair card.">
+            <label class="switch entries-toggle-switch" for="pair-study-hide-toggle">
+              <input type="checkbox" id="pair-study-hide-toggle">
+              <span class="switch-track"><span class="switch-thumb"></span></span>
+            </label>
+            <span class="entries-toggle-label">Hide Definitions &amp; Nuances</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="pair-polarity-filter-row" id="pair-polarity-filter-row">
+        <span class="visibility-bar-label">Filter by Polarity:</span>
+        <button type="button" class="pair-filter-chip active" data-pol-filter="">All</button>
+        <button type="button" class="pair-filter-chip pair-chip-pos" data-pol-filter="Positive (+)">+ Positive</button>
+        <button type="button" class="pair-filter-chip pair-chip-neg" data-pol-filter="Negative (-)">− Negative</button>
+        <button type="button" class="pair-filter-chip pair-chip-neu" data-pol-filter="Neutral (0)">0 Neutral</button>
+        <span class="visibility-bar-hint" id="pair-study-hint">Turn on "Hide Definitions &amp; Nuances" to quiz yourself on tone &amp; pair relationships.</span>
+      </div>
+    </div>
+
+    <!-- Saved Word Pairs List -->
+    <div id="pairs-cards-container" class="pairs-cards-container"></div>
   </section>
 
 </main>
